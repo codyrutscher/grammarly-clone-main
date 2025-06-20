@@ -376,31 +376,113 @@ export function TextEditor() {
   };
 
   const renderSuggestionsByType = (type: Suggestion['type']) => {
+    const typeStyles = {
+      grammar: { 
+        bg: isDarkMode ? 'bg-red-900/20' : 'bg-red-50', 
+        border: isDarkMode ? 'border-red-700' : 'border-red-300',
+        text: isDarkMode ? 'text-red-300' : 'text-red-700',
+        icon: '🔴'
+      },
+      spelling: { 
+        bg: isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50', 
+        border: isDarkMode ? 'border-blue-700' : 'border-blue-300',
+        text: isDarkMode ? 'text-blue-300' : 'text-blue-700',
+        icon: '🔵'
+      },
+      style: { 
+        bg: isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50', 
+        border: isDarkMode ? 'border-purple-700' : 'border-purple-300',
+        text: isDarkMode ? 'text-purple-300' : 'text-purple-700',
+        icon: '🟣'
+      },
+      readability: { 
+        bg: isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50', 
+        border: isDarkMode ? 'border-orange-700' : 'border-orange-300',
+        text: isDarkMode ? 'text-orange-300' : 'text-orange-700',
+        icon: '🟠'
+      },
+      structure: { 
+        bg: isDarkMode ? 'bg-green-900/20' : 'bg-green-50', 
+        border: isDarkMode ? 'border-green-700' : 'border-green-300',
+        text: isDarkMode ? 'text-green-300' : 'text-green-700',
+        icon: '🟢'
+      },
+      tone: { 
+        bg: isDarkMode ? 'bg-yellow-900/20' : 'bg-yellow-50', 
+        border: isDarkMode ? 'border-yellow-700' : 'border-yellow-300',
+        text: isDarkMode ? 'text-yellow-300' : 'text-yellow-700',
+        icon: '🟡'
+      }
+    };
+
+    const style = typeStyles[type] || typeStyles.style;
+
     return suggestions
       .filter(s => s.type === type)
       .map(suggestion => (
         <div
           key={suggestion.id}
-          className={`suggestion-item ${suggestion.type}`}
-          onClick={() => handleSuggestionClick(suggestion)}
+          className={`group p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${style.bg} ${style.border} hover:shadow-md hover:scale-[1.02]`}
         >
-          <div className="suggestion-content">
-            <span className="original">{suggestion.originalText}</span>
-            <span className="arrow">→</span>
-            <span className="suggested">{suggestion.suggestion}</span>
+          <div className="flex items-start gap-3">
+            <span className="text-lg mt-0.5">{style.icon}</span>
+            <div className="flex-1">
+              <div className={`font-medium text-sm mb-2 ${style.text}`}>
+                {type.charAt(0).toUpperCase() + type.slice(1)} Issue
+              </div>
+              
+              {/* Original vs Suggested text */}
+              <div className={`space-y-2 mb-3 p-3 rounded-md ${isDarkMode ? 'bg-gray-800/50' : 'bg-white/50'}`}>
+                <div className="flex items-start gap-2">
+                  <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} min-w-[60px]`}>Original:</span>
+                  <span className={`text-sm line-through ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    {suggestion.originalText}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} min-w-[60px]`}>Suggested:</span>
+                  <span className={`text-sm font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>
+                    {suggestion.suggestion}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Explanation */}
+              <p className={`text-xs mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {suggestion.explanation}
+              </p>
+              
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSuggestionClick(suggestion);
+                  }}
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    isDarkMode 
+                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  ✓ Fix It
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSuggestionReject(suggestion);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="suggestion-explanation">
-            {suggestion.explanation}
-          </div>
-          <button
-            className="reject-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSuggestionReject(suggestion);
-            }}
-          >
-            Reject
-          </button>
         </div>
       ));
   };
@@ -483,10 +565,10 @@ export function TextEditor() {
         </div>
       )}
       
-      <div className={`flex-1 relative ${showAnalysis ? 'border-r border-gray-200 dark:border-gray-700' : ''}`}>
-        <div className={`flex-1 flex transition-colors ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className={`flex-1 relative overflow-x-auto ${showAnalysis ? 'border-r border-gray-200 dark:border-gray-700' : ''}`}>
+        <div className={`h-full flex transition-colors ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
           {/* Main Editor Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Editor Header */}
             <div className={`border-b shadow-sm transition-colors duration-300 ${
               isDarkMode 
@@ -934,10 +1016,9 @@ export function TextEditor() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Suggestions Sidebar */}
-        <div className={`w-full lg:w-80 border-l-2 flex flex-col shadow-xl transition-colors ${
+          
+          {/* Suggestions Sidebar */}
+        <div className={`w-80 border-l-2 flex flex-col shadow-xl transition-colors flex-shrink-0 ${
           isDarkMode 
             ? 'bg-gray-800 border-gray-600' 
             : 'bg-white border-gray-300'
@@ -1044,8 +1125,11 @@ export function TextEditor() {
               {renderSuggestionsByType('spelling')}
               {renderSuggestionsByType('style')}
               {renderSuggestionsByType('readability')}
+              {renderSuggestionsByType('structure')}
+              {renderSuggestionsByType('tone')}
             </div>
           )}
+        </div>
         </div>
       </div>
       
