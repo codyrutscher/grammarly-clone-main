@@ -20,7 +20,9 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportText = () => {
-    const blob = new Blob([content], { type: 'text/plain' });
+    // Strip HTML tags for plain text export
+    const plainText = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+    const blob = new Blob([plainText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -54,21 +56,151 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
   };
 
   const handleExportDocx = async () => {
+    console.log('Exporting content:', content);
+    console.log('Content length:', content.length);
+    console.log('First 500 chars:', content.substring(0, 500));
+    console.log('Last 500 chars:', content.substring(content.length - 500));
     try {
       // Dynamic import to avoid loading the library if not needed
       const { Document, Packer, Paragraph, TextRun } = await import('docx');
       
+      // Parse HTML content to extract formatted text
+      const parser = new DOMParser();
+      const htmlDoc = parser.parseFromString(content, 'text/html');
+      
+      const paragraphs: any[] = [];
+      
+      // Function to process a node and extract formatted text
+      const processNode = (node: Node, currentRuns: any[] = []): any[] => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          if (text.trim()) {
+            currentRuns.push(new TextRun({
+              text: text,
+              bold: false,
+              italics: false,
+              underline: undefined
+            }));
+          }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const tagName = element.tagName.toLowerCase();
+          
+          if (tagName === 'br') {
+            // Handle line breaks
+            currentRuns.push(new TextRun({ text: '\n' }));
+            return currentRuns;
+          } else if (tagName === 'div' || tagName === 'p') {
+            // Handle block elements
+            const newRuns: any[] = [];
+            element.childNodes.forEach(child => {
+              const childRuns = processNode(child, []);
+              newRuns.push(...childRuns);
+            });
+            if (newRuns.length > 0) {
+              paragraphs.push(new Paragraph({ children: newRuns }));
+            }
+            return [];
+          } else {
+            // Handle inline formatting
+            const isBold = tagName === 'strong' || tagName === 'b' || 
+              element.style.fontWeight === 'bold' || 
+              window.getComputedStyle(element).fontWeight === 'bold';
+            
+            const isItalic = tagName === 'em' || tagName === 'i' || 
+              element.style.fontStyle === 'italic' || 
+              window.getComputedStyle(element).fontStyle === 'italic';
+            
+            const isUnderline = tagName === 'u' || 
+              element.style.textDecoration?.includes('underline') ||
+              window.getComputedStyle(element).textDecoration?.includes('underline');
+            
+            // Extract font family from style
+            let fontFamily = element.style.fontFamily || window.getComputedStyle(element).fontFamily;
+            if (fontFamily) {
+              // Clean up font family string
+              fontFamily = fontFamily.replace(/['"]/g, '').split(',')[0].trim();
+            }
+            
+            const newRuns: any[] = [];
+            element.childNodes.forEach(child => {
+              if (child.nodeType === Node.TEXT_NODE) {
+                const text = child.textContent || '';
+                if (text.trim()) {
+                  const runOptions: any = {
+                    text: text,
+                    bold: isBold,
+                    italics: isItalic,
+                    underline: isUnderline ? {} : undefined
+                  };
+                  
+                  // Add font if specified
+                  if (fontFamily && fontFamily !== 'inherit') {
+                    runOptions.font = { name: fontFamily };
+                  }
+                  
+                  newRuns.push(new TextRun(runOptions));
+                }
+              } else {
+                const childRuns = processNode(child, []);
+                childRuns.forEach(run => {
+                  // Inherit parent formatting if not already set
+                  if (run.bold === undefined || run.bold === false) run.bold = isBold;
+                  if (run.italics === undefined || run.italics === false) run.italics = isItalic;
+                  if (run.underline === undefined && isUnderline) run.underline = {};
+                  
+                  // Inherit font if not already set
+                  if (fontFamily && fontFamily !== 'inherit' && !run.font) {
+                    run.font = { name: fontFamily };
+                  }
+                  
+                  newRuns.push(run);
+                });
+              }
+            });
+            return newRuns;
+          }
+        }
+        return currentRuns;
+      };
+      
+      // Process the HTML content
+      const bodyChildren = htmlDoc.body.childNodes;
+      let currentRuns: any[] = [];
+      
+      bodyChildren.forEach(node => {
+        const runs = processNode(node, currentRuns);
+        if (runs.length > 0) {
+          currentRuns = runs;
+        }
+      });
+      
+      // Add any remaining runs as a paragraph
+      if (currentRuns.length > 0) {
+        paragraphs.push(new Paragraph({ children: currentRuns }));
+      }
+      
+      // If no paragraphs were created, create one with the plain text
+      if (paragraphs.length === 0) {
+        // Parse any remaining text content
+        const text = htmlDoc.body.textContent || '';
+        if (text.trim()) {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({
+              text: text,
+              font: { name: 'Arial' } // Default font
+            })]
+          }));
+        }
+      }
+      
       const doc = new Document({
         sections: [{
           properties: {},
-          children: content.split('\n').map(line => 
-            new Paragraph({
-              children: [new TextRun(line)]
-            })
-          )
+          children: paragraphs
         }]
       });
-
+  
       const blob = await Packer.toBlob(doc);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -110,7 +242,23 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
 
   const handleCopyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(content);
+      // Copy as rich text (HTML) if possible
+      if (navigator.clipboard.write) {
+        const htmlBlob = new Blob([content], { type: 'text/html' });
+        const plainText = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+        const textBlob = new Blob([plainText], { type: 'text/plain' });
+        
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': htmlBlob,
+            'text/plain': textBlob
+          })
+        ]);
+      } else {
+        // Fallback to plain text
+        const plainText = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+        await navigator.clipboard.writeText(plainText);
+      }
       alert('Content copied to clipboard!');
     } catch (error) {
       console.error('Failed to copy:', error);

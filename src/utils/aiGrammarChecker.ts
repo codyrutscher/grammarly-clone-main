@@ -87,6 +87,7 @@ const defaultWritingModes: Record<WritingModeType, WritingMode> = {
 // Generate system prompt based on writing settings
 function generateSystemPrompt(settings: WritingSettings): string {
   let basePrompt = `You are an expert writing assistant. Analyze the provided text and identify specific writing improvements.`;
+  basePrompt += `\n\nIMPORTANT: The start_pos and end_pos values must be character positions in the PLAIN TEXT version of the content (with all HTML tags stripped). Count characters from the beginning of the plain text, starting at position 0.`;
 
   // Add user feedback context
   const feedbackStats = useSuggestionFeedbackStore.getState().getFeedbackStats();
@@ -221,6 +222,19 @@ export async function checkTextWithAI(text: string, settings?: WritingSettings):
   try {
     const systemPrompt = generateSystemPrompt(currentSettings);
     
+    // Add this instruction to the system prompt
+    const enhancedSystemPrompt = systemPrompt + `\n\nCRITICAL: When providing start_pos and end_pos:
+1. Count character positions starting from 0
+2. Count ALL characters including spaces and punctuation
+3. The positions should allow extracting the exact "original" text using text.substring(start_pos, end_pos)
+4. Double-check that text.substring(start_pos, end_pos) === original
+
+Example: For the text "The cat is big." and the issue with "cat":
+- "cat" starts at position 4 (after "The ")
+- "cat" ends at position 7
+- start_pos: 4, end_pos: 7
+- Verification: "The cat is big.".substring(4, 7) === "cat" ✓`;
+    
     // Add timeout to prevent infinite loading
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -236,7 +250,7 @@ export async function checkTextWithAI(text: string, settings?: WritingSettings):
         messages: [
           {
             role: 'system',
-            content: systemPrompt
+            content: enhancedSystemPrompt
           },
           {
             role: 'user',
@@ -255,15 +269,13 @@ export async function checkTextWithAI(text: string, settings?: WritingSettings):
       const errorData = await response.text();
       console.error('OpenAI API error:', response.status, errorData);
       
-      // Handle specific error cases
       if (response.status === 401) {
         console.error('AI Grammar Checker: Invalid API key');
+        alert('Invalid OpenAI API key. Please check your configuration.');
         return [];
       } else if (response.status === 429) {
         console.error('AI Grammar Checker: Rate limit exceeded');
-        return [];
-      } else if (response.status >= 500) {
-        console.error('AI Grammar Checker: OpenAI server error');
+        alert('OpenAI rate limit exceeded. Please try again later.');
         return [];
       }
       
@@ -283,140 +295,92 @@ export async function checkTextWithAI(text: string, settings?: WritingSettings):
     // Parse the JSON response
     let aiSuggestions: OpenAISuggestion[];
     try {
-      // Try to extract JSON from the response
       const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         aiSuggestions = JSON.parse(jsonMatch[0]);
       } else {
-        // If no JSON array found, try parsing the entire response
         aiSuggestions = JSON.parse(aiResponse);
       }
     } catch (parseError) {
-      console.warn('Failed to parse JSON response, trying text parsing:', parseError);
-      return parseTextResponse(aiResponse, text);
-    }
-
-    if (!Array.isArray(aiSuggestions)) {
-      console.warn('AI response is not an array, returning empty suggestions');
+      console.warn('Failed to parse JSON response:', parseError);
+      console.log('Response that failed to parse:', aiResponse);
       return [];
     }
 
-    console.log('AI Grammar Checker: Parsed suggestions:', aiSuggestions.length);
+    if (!Array.isArray(aiSuggestions)) {
+      console.warn('AI response is not an array:', aiSuggestions);
+      return [];
+    }
 
-    // Filter out invalid suggestions
-    const filteredSuggestions = aiSuggestions.filter(suggestion => {
-      return suggestion.original && 
-             suggestion.suggestion && 
-             typeof suggestion.start_pos === 'number' &&
-             typeof suggestion.end_pos === 'number' &&
-             suggestion.start_pos >= 0 &&
-             suggestion.end_pos <= text.length &&
-             suggestion.start_pos < suggestion.end_pos;
-    });
+    console.log('AI Grammar Checker: Parsed suggestions:', aiSuggestions);
 
-    console.log('AI Grammar Checker: Filtered suggestions:', filteredSuggestions.length);
-
-    // Convert OpenAI suggestions to our format
-    const suggestions: GrammarSuggestion[] = filteredSuggestions
-      .map((aiSugg, index) => {
-        // Validate the AI suggestion
-        if (!aiSugg.original || !aiSugg.suggestion || typeof aiSugg.start_pos !== 'number') {
-          console.warn('Invalid AI suggestion:', aiSugg);
-          return null;
+    // Process and validate each suggestion
+    const validSuggestions: GrammarSuggestion[] = [];
+    
+    for (const aiSugg of aiSuggestions) {
+      console.log('Processing suggestion:', aiSugg);
+      
+      // Skip if missing required fields
+      if (!aiSugg.original || !aiSugg.suggestion || 
+          typeof aiSugg.start_pos !== 'number' || 
+          typeof aiSugg.end_pos !== 'number') {
+        console.warn('Skipping invalid suggestion - missing fields:', aiSugg);
+        continue;
+      }
+      
+      // Verify the positions
+      const extractedText = text.substring(aiSugg.start_pos, aiSugg.end_pos);
+      
+      if (extractedText !== aiSugg.original) {
+        console.warn('Position mismatch:', {
+          suggestion: aiSugg,
+          expected: aiSugg.original,
+          extracted: extractedText,
+          positions: `${aiSugg.start_pos}-${aiSugg.end_pos}`
+        });
+        
+        // Try to find the correct position
+        const correctPos = text.indexOf(aiSugg.original);
+        if (correctPos !== -1) {
+          console.log('Found correct position:', correctPos);
+          aiSugg.start_pos = correctPos;
+          aiSugg.end_pos = correctPos + aiSugg.original.length;
+        } else {
+          console.warn('Could not find text in document, skipping');
+          continue;
         }
+      }
+      
+      // Create the suggestion
+      const suggestion: GrammarSuggestion = {
+        id: `ai-${Date.now()}-${Math.random()}`,
+        type: (aiSugg.type || 'style') as GrammarSuggestion['type'],
+        start: aiSugg.start_pos,
+        end: aiSugg.end_pos,
+        original: aiSugg.original,
+        originalText: aiSugg.original,
+        suggestion: aiSugg.suggestion,
+        message: aiSugg.reason || 'Suggested improvement',
+        explanation: aiSugg.reason || 'Suggested improvement',
+        severity: mapSeverity(aiSugg.severity || 'low'),
+        startIndex: aiSugg.start_pos,
+        endIndex: aiSugg.end_pos
+      };
+      
+      validSuggestions.push(suggestion);
+    }
 
-        // Verify the positions are correct
-        const actualText = text.substring(aiSugg.start_pos, aiSugg.end_pos);
-        if (actualText !== aiSugg.original) {
-          console.warn('Position mismatch, attempting to find correct position:', {
-            expected: aiSugg.original,
-            actualAtPosition: actualText,
-            positions: `${aiSugg.start_pos}-${aiSugg.end_pos}`
-          });
-          
-          // Try to find the text in the document
-          const foundIndex = text.indexOf(aiSugg.original);
-          if (foundIndex !== -1) {
-            aiSugg.start_pos = foundIndex;
-            aiSugg.end_pos = foundIndex + aiSugg.original.length;
-            console.log('Corrected positions:', aiSugg.start_pos, aiSugg.end_pos);
-          } else {
-            console.warn('Could not find original text in document, skipping suggestion');
-            return null;
-          }
-        }
-
-        return {
-          id: `ai-${index}-${Date.now()}-${Math.random()}`,
-          type: aiSugg.type as GrammarSuggestion['type'],
-          start: aiSugg.start_pos,
-          end: aiSugg.end_pos,
-          original: aiSugg.original,
-          originalText: aiSugg.original,
-          suggestion: aiSugg.suggestion,
-          message: aiSugg.reason,
-          explanation: aiSugg.reason,
-          severity: mapSeverity(aiSugg.severity),
-          startIndex: aiSugg.start_pos,
-          endIndex: aiSugg.end_pos
-        } as GrammarSuggestion;
-      })
-      .filter((suggestion): suggestion is GrammarSuggestion => suggestion !== null);
-
-    console.log('AI Grammar Checker: Processed suggestions:', {
-      total: suggestions.length,
-      byType: suggestions.reduce((acc, s) => {
-        acc[s.type] = (acc[s.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      bySeverity: suggestions.reduce((acc, s) => {
-        acc[s.severity] = (acc[s.severity] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    });
-
-    // Filter suggestions based on user feedback patterns
-    const feedbackStats = useSuggestionFeedbackStore.getState().getFeedbackStats();
-    const uniqueSuggestions = [...new Set(suggestions)];
-    const personalizedSuggestions = uniqueSuggestions
-      .sort((a, b) => {
-        // Prioritize suggestion types with higher acceptance rates
-        const aRate = feedbackStats.acceptanceRate[a.type] || 50;
-        const bRate = feedbackStats.acceptanceRate[b.type] || 50;
-        return bRate - aRate;
-      })
-      .filter(suggestion => {
-        // Filter out suggestions similar to commonly rejected ones
-        const isCommonlyRejected = feedbackStats.commonRejected.some(
-          rejected => suggestion.suggestion.toLowerCase().includes(rejected.toLowerCase())
-        );
-        return !isCommonlyRejected;
-      });
-
-    console.log('Grammar Checker: Final results:', {
-      totalSuggestions: personalizedSuggestions.length,
-      uniqueSuggestions: uniqueSuggestions.length,
-      byType: uniqueSuggestions.reduce((acc, s) => {
-        acc[s.type] = (acc[s.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      bySeverity: uniqueSuggestions.reduce((acc, s) => {
-        acc[s.severity] = (acc[s.severity] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    });
-
-    return personalizedSuggestions;
+    console.log('AI Grammar Checker: Valid suggestions:', validSuggestions.length);
+    return validSuggestions;
 
   } catch (error) {
     console.error('AI Grammar Checker: Error:', error);
     
-    // Handle specific error types
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        console.error('AI Grammar Checker: Request timed out');
-      } else if (error.message.includes('fetch')) {
-        console.error('AI Grammar Checker: Network error');
+        alert('Request timed out. Please try again.');
+      } else {
+        alert(`Error analyzing text: ${error.message}`);
       }
     }
     

@@ -32,6 +32,7 @@ import { HelpCenterPage } from './components/HelpCenterPage'
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage'
 import { TermsOfServicePage } from './components/TermsOfServicePage'
 import { CitationPanel } from './components/CitationPanel'
+import { ResearchPanel } from './components/ResearchPanel'
 
 function App() {
   useAuthProvider()
@@ -81,6 +82,7 @@ function App() {
   const [showPrivacyPolicyPage, setShowPrivacyPolicyPage] = useState(false)
   const [showTermsOfServicePage, setShowTermsOfServicePage] = useState(false)
   const [showCitationPanel, setShowCitationPanel] = useState(false)
+  const [showResearchPanel, setShowResearchPanel] = useState(false)
   
   const { saveStatus } = useAutoSave()
 
@@ -925,6 +927,15 @@ function App() {
                 <span className="sm:hidden">📚</span>
               </button>
               
+              {/* Research Button */}
+              <button
+                onClick={() => setShowResearchPanel(true)}
+                className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-lg hover:from-indigo-600 hover:to-blue-700 transition-all duration-200 shadow-md border border-indigo-400"
+              >
+                <span className="hidden sm:inline">🔍 Research</span>
+                <span className="sm:hidden">🔍</span>
+              </button>
+              
               {/* Subscription Management for Mobile */}
               {subscriptionType === 'premium' && (
                 <button
@@ -1076,6 +1087,12 @@ function App() {
       <CitationPanel
         isOpen={showCitationPanel}
         onClose={() => setShowCitationPanel(false)}
+      />
+
+      {/* Research Panel */}
+      <ResearchPanel
+        isOpen={showResearchPanel}
+        onClose={() => setShowResearchPanel(false)}
       />
     </div>
   )

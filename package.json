@@ -14,6 +14,7 @@
     "docx-preview": "^0.3.5",
     "file-saver": "^2.0.5",
     "firebase": "^11.9.1",
+    "html-docx-js-typescript": "^0.1.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.518.0",

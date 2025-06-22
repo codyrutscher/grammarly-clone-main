@@ -26,7 +26,19 @@ export function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'improve' | 'generate'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'improve' | 'generate' | 'essay'>('chat');
+  const [essayStep, setEssayStep] = useState(0);
+const [essayConfig, setEssayConfig] = useState<{
+  topic: string;
+  paragraphs: number;
+  tone: string;
+  academicLevel: string;
+}>({
+  topic: '',
+  paragraphs: 5,
+  tone: '',
+  academicLevel: ''
+});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -187,11 +199,12 @@ export function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
           
           {/* Tabs */}
           <div className="flex mt-6 space-x-1">
-            {[
-              { id: 'chat', label: '💬 Chat', icon: '💬' },
-              { id: 'improve', label: '✨ Improve', icon: '✨' },
-              { id: 'generate', label: '🎯 Generate', icon: '🎯' }
-            ].map((tab) => (
+          {[
+  { id: 'chat', label: '💬 Chat', icon: '💬' },
+  { id: 'improve', label: '✨ Improve', icon: '✨' },
+  { id: 'generate', label: '🎯 Generate', icon: '🎯' },
+  { id: 'essay', label: '📝 Essay Guide', icon: '📝' }
+].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -441,6 +454,189 @@ export function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
               )}
             </div>
           )}
+
+{activeTab === 'essay' && (
+  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="text-center mb-6">
+      <div className="w-16 h-16 bg-gradient-to-br from-indigo-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+        <span className="text-2xl">📝</span>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-800 mb-2">Essay Writing Guide</h3>
+      <p className="text-sm text-gray-600">
+        Let me help you write a perfect essay step by step
+      </p>
+    </div>
+
+    {essayStep === 0 && (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            What's your essay topic?
+          </label>
+          <input
+            type="text"
+            value={essayConfig.topic}
+            onChange={(e) => setEssayConfig({...essayConfig, topic: e.target.value})}
+            placeholder="e.g., Climate change impact on biodiversity"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <button
+          onClick={() => essayConfig.topic && setEssayStep(1)}
+          disabled={!essayConfig.topic}
+          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50"
+        >
+          Next: Choose Length
+        </button>
+      </div>
+    )}
+
+    {essayStep === 1 && (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            How many paragraphs do you need?
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {[3, 5, 7, 10].map((num) => (
+              <button
+                key={num}
+                onClick={() => {
+                  setEssayConfig({...essayConfig, paragraphs: num});
+                  setEssayStep(2);
+                }}
+                className="bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-200 text-indigo-700 py-3 px-4 rounded-xl border border-indigo-200"
+              >
+                <div className="font-semibold">{num} paragraphs</div>
+                <div className="text-xs mt-1">
+                  {num === 3 ? 'Short essay' : 
+                   num === 5 ? 'Standard essay' : 
+                   num === 7 ? 'Extended essay' : 
+                   'Long essay'}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {essayStep === 2 && (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            What tone should the essay have?
+          </label>
+          <div className="space-y-3">
+            {[
+              { value: 'formal', label: 'Formal', desc: 'Academic and professional' },
+              { value: 'persuasive', label: 'Persuasive', desc: 'Convincing and argumentative' },
+              { value: 'informative', label: 'Informative', desc: 'Educational and neutral' },
+              { value: 'creative', label: 'Creative', desc: 'Engaging and descriptive' }
+            ].map((tone) => (
+              <button
+                key={tone.value}
+                onClick={() => {
+                  setEssayConfig({...essayConfig, tone: tone.value});
+                  setEssayStep(3);
+                }}
+                className="w-full text-left bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 text-purple-700 py-3 px-4 rounded-xl border border-purple-200"
+              >
+                <div className="font-semibold">{tone.label}</div>
+                <div className="text-xs text-purple-600">{tone.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {essayStep === 3 && (
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            What's the academic level?
+          </label>
+          <div className="space-y-3">
+            {[
+              { value: 'high-school', label: 'High School', desc: 'Grade 9-12' },
+              { value: 'undergraduate', label: 'Undergraduate', desc: 'College/University' },
+              { value: 'graduate', label: 'Graduate', desc: 'Masters/PhD level' },
+              { value: 'professional', label: 'Professional', desc: 'Business/Industry' }
+            ].map((level) => (
+              <button
+                key={level.value}
+                onClick={async () => {
+                  setEssayConfig({...essayConfig, academicLevel: level.value});
+                  setLoading(true);
+                  
+                  const prompt = `Write a ${essayConfig.paragraphs}-paragraph ${essayConfig.tone} essay about "${essayConfig.topic}" at a ${level.label} level. Include an introduction, body paragraphs, and conclusion.`;
+                  
+                  const userMessage: ChatMessage = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: `Generate essay: ${essayConfig.topic} (${essayConfig.paragraphs} paragraphs, ${essayConfig.tone} tone, ${level.label} level)`,
+                    timestamp: new Date()
+                  };
+
+                  setMessages(prev => [...prev, userMessage]);
+                  
+                  try {
+                    const response = await aiService.generateContent(prompt, 'expansion');
+                    
+                    if (response.success && response.message) {
+                      const assistantMessage: ChatMessage = {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: response.message,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [...prev, assistantMessage]);
+                      // Reset essay state first
+                      setEssayStep(0);
+                      setEssayConfig({ topic: '', paragraphs: 5, tone: '', academicLevel: '' });
+                      // Switch to chat tab after a small delay to ensure state updates
+                      setTimeout(() => {
+                        setActiveTab('chat');
+                      }, 100);
+                    } else {
+                      alert(response.error || 'Failed to generate essay');
+                    }
+                  } catch (error) {
+                    console.error('Error generating essay:', error);
+                    alert('Error generating essay. Please try again.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="w-full text-left bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 text-green-700 py-3 px-4 rounded-xl border border-green-200"
+              >
+                <div className="font-semibold">{level.label}</div>
+                <div className="text-xs text-green-600">{level.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {essayStep > 0 && (
+      <button
+        onClick={() => setEssayStep(essayStep - 1)}
+        className="w-full text-purple-600 hover:text-purple-700 text-sm font-medium py-2"
+      >
+        ← Back to previous step
+      </button>
+    )}
+
+    {loading && (
+      <div className="text-center py-6">
+        <div className="animate-spin rounded-full h-8 w-8 border-3 border-purple-600 border-t-transparent mx-auto mb-3"></div>
+        <p className="text-sm text-gray-600">Generating your essay...</p>
+      </div>
+    )}
+  </div>
+)}
         </div>
       </div>
     </div>

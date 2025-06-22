@@ -74,12 +74,53 @@ function calculateColemanLiau(totalChars: number, totalWords: number, totalSente
 
 // Helper function to calculate standard deviation
 function calculateStandardDeviation(numbers: number[]): number {
-  const mean = numbers.reduce((a, b) => a + b) / numbers.length;
+  if (numbers.length === 0) return 0;
+  const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
   const variance = numbers.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / numbers.length;
   return Math.sqrt(variance);
 }
 
 export function analyzeWriting(text: string, suggestions: Suggestion[]): WritingAnalytics {
+  // Handle empty or whitespace-only text
+  if (!text || text.trim().length === 0) {
+    return {
+      readabilityScores: {
+        fleschKincaid: 0,
+        automatedReadability: 0,
+        colemanLiau: 0
+      },
+      vocabularyMetrics: {
+        uniqueWords: 0,
+        complexWords: 0,
+        averageWordLength: 0,
+        vocabularyRichness: 0
+      },
+      structureMetrics: {
+        averageSentenceLength: 0,
+        sentenceLengthVariation: 0,
+        paragraphCount: 0,
+        averageParagraphLength: 0
+      },
+      styleMetrics: {
+        passiveVoiceCount: 0,
+        passiveVoicePercentage: 0,
+        adverbCount: 0,
+        adverbPercentage: 0,
+        transitionWordCount: 0,
+        transitionWordPercentage: 0
+      },
+      toneAnalysis: {
+        formality: 0.5,
+        confidence: 0,
+        emotion: {
+          positive: 0,
+          negative: 0,
+          neutral: 1
+        }
+      }
+    };
+  }
+
   // Split text into components
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
@@ -89,7 +130,7 @@ export function analyzeWriting(text: string, suggestions: Suggestion[]): Writing
   // Calculate basic counts
   const totalChars = text.replace(/\s/g, '').length;
   const totalWords = words.length;
-  const totalSentences = sentences.length;
+  const totalSentences = Math.max(1, sentences.length); // Prevent division by zero
   const totalSyllables = words.reduce((sum, word) => sum + countSyllables(word), 0);
   const complexWords = words.filter(word => countSyllables(word) >= 3).length;
 
@@ -126,29 +167,29 @@ export function analyzeWriting(text: string, suggestions: Suggestion[]): Writing
   // Return comprehensive analytics
   return {
     readabilityScores: {
-      fleschKincaid: calculateFleschKincaid(totalSyllables, totalWords, totalSentences),
-      automatedReadability: (4.71 * (totalChars / totalWords) + 0.5 * (totalWords / totalSentences) - 21.43),
-      colemanLiau: calculateColemanLiau(totalChars, totalWords, totalSentences)
+      fleschKincaid: totalWords > 0 ? calculateFleschKincaid(totalSyllables, totalWords, totalSentences) : 0,
+      automatedReadability: totalWords > 0 ? (4.71 * (totalChars / totalWords) + 0.5 * (totalWords / totalSentences) - 21.43) : 0,
+      colemanLiau: totalWords > 0 ? calculateColemanLiau(totalChars, totalWords, totalSentences) : 0
     },
     vocabularyMetrics: {
       uniqueWords: uniqueWords.size,
       complexWords,
-      averageWordLength: totalChars / totalWords,
-      vocabularyRichness: uniqueWords.size / totalWords
+      averageWordLength: totalWords > 0 ? totalChars / totalWords : 0,
+      vocabularyRichness: totalWords > 0 ? uniqueWords.size / totalWords : 0
     },
     structureMetrics: {
       averageSentenceLength: totalWords / totalSentences,
       sentenceLengthVariation: calculateStandardDeviation(sentenceLengths),
       paragraphCount: paragraphs.length,
-      averageParagraphLength: totalWords / paragraphs.length
+      averageParagraphLength: paragraphs.length > 0 ? totalWords / paragraphs.length : 0
     },
     styleMetrics: {
       passiveVoiceCount: passiveCount,
-      passiveVoicePercentage: (passiveCount / totalSentences) * 100,
+      passiveVoicePercentage: totalSentences > 0 ? (passiveCount / totalSentences) * 100 : 0,
       adverbCount,
-      adverbPercentage: (adverbCount / totalWords) * 100,
+      adverbPercentage: totalWords > 0 ? (adverbCount / totalWords) * 100 : 0,
       transitionWordCount: transitionCount,
-      transitionWordPercentage: (transitionCount / totalWords) * 100
+      transitionWordPercentage: totalWords > 0 ? (transitionCount / totalWords) * 100 : 0
     },
     toneAnalysis: {
       formality,

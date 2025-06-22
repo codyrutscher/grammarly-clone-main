@@ -215,4 +215,36 @@ export type GrammarSuggestion = {
   startIndex?: number;
   endIndex?: number;
   originalText?: string;
-}; 
+};
+
+// Research Paper Types
+export interface ResearchResult {
+  id: string;
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+  publishedDate?: string;
+  relevanceScore: number;
+  type: 'webpage' | 'article' | 'paper' | 'news';
+  tags: string[];
+}
+
+export interface ResearchQuery {
+  query: string;
+  filters?: {
+    dateRange?: 'any' | 'past_year' | 'past_month' | 'past_week';
+    type?: 'all' | 'academic' | 'news' | 'government';
+    language?: string;
+  };
+  limit?: number;
+}
+
+export interface ResearchSearchState {
+  results: ResearchResult[];
+  isSearching: boolean;
+  query: string;
+  totalResults: number;
+  hasMore: boolean;
+  error?: string;
+} 
