@@ -5,6 +5,7 @@ import { useAuthProvider } from './hooks/useAuthProvider'
 import { useProfileProvider } from './hooks/useProfileProvider'
 import { useAutoSave } from './hooks/useAutoSave'
 import { DarkModeToggle } from './components/DarkModeToggle'
+import { ProfileAvatar } from './components/ProfileAvatar'
 import { useDarkModeStore } from './store/useDarkModeStore'
 import { useProfileStore } from './store/useProfileStore'
 import { useTeamStore } from './store/useTeamStore'
@@ -37,7 +38,6 @@ function App() {
   useProfileProvider()
   
   const { user, loading, isSigningUp } = useAuthStore()
-  const { profile, loading: profileLoading } = useProfileStore()
   const { setUserTeams } = useTeamStore()
   const { isDarkMode } = useDarkModeStore()
   const { subscriptionType, documentsUsed, maxDocuments } = useSubscriptionStore()
@@ -90,12 +90,21 @@ function App() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className={`h-screen flex items-center justify-center transition-colors duration-300 ${
+        isDarkMode 
+          ? 'bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900' 
+          : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50'
+      }`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-grammarly-blue border-t-transparent mx-auto mb-6"></div>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-grammarly-blue border-t-transparent mx-auto mb-6"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">✍️</span>
+            </div>
+          </div>
           <div className="space-y-2">
-            <p className="text-lg font-medium text-gray-700">Loading Grammarly Clone...</p>
-            <p className="text-sm text-gray-500">Preparing your writing workspace</p>
+            <p className={`text-lg font-medium transition-colors ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>Loading StudyWrite...</p>
+            <p className={`text-sm animate-pulse transition-colors ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Preparing your writing workspace</p>
           </div>
         </div>
       </div>
@@ -810,16 +819,11 @@ function App() {
               
               {/* Profile/Settings Dropdown */}
               <div className="relative">
-                <button
+                <ProfileAvatar 
+                  size="md"
                   onClick={() => setShowProfileModal(true)}
-                  className={`p-2 rounded-lg transition-colors border shadow-sm ${
-                    isDarkMode 
-                      ? 'text-gray-300 hover:bg-gray-700 border-gray-600 bg-gray-700/50' 
-                      : 'text-gray-600 hover:bg-gray-100 border-gray-300 bg-gray-50'
-                  }`}
-                >
-                  <span className="text-lg">👤</span>
-                </button>
+                  className="shadow-sm"
+                />
               </div>
               
               {/* Logout Button */}
@@ -858,16 +862,23 @@ function App() {
         }`}>
           {/* Auto-save status */}
           {saveStatus && (
-            <div className={`px-4 py-2 text-sm border-b-2 transition-colors ${
+            <div className={`px-4 py-2 text-sm border-b transition-all transform ${
               saveStatus === 'saving' 
-                ? isDarkMode ? 'bg-yellow-900/50 text-yellow-200 border-yellow-600' : 'bg-yellow-50 text-yellow-800 border-yellow-300'
+                ? isDarkMode ? 'bg-yellow-900/30 text-yellow-200 border-yellow-600' : 'bg-yellow-50 text-yellow-700 border-yellow-300'
                 : saveStatus === 'saved'
-                ? isDarkMode ? 'bg-green-900/50 text-green-200 border-green-600' : 'bg-green-50 text-green-800 border-green-300'
-                : isDarkMode ? 'bg-red-900/50 text-red-200 border-red-600' : 'bg-red-50 text-red-800 border-red-300'
+                ? isDarkMode ? 'bg-green-900/30 text-green-200 border-green-600' : 'bg-green-50 text-green-700 border-green-300'
+                : isDarkMode ? 'bg-red-900/30 text-red-200 border-red-600' : 'bg-red-50 text-red-700 border-red-300'
             }`}>
-              {saveStatus === 'saving' && '💾 Saving...'}
-              {saveStatus === 'saved' && '✅ All changes saved'}
-              {saveStatus === 'unsaved' && '❌ Unsaved changes'}
+              <div className="flex items-center space-x-2">
+                {saveStatus === 'saving' && <span className="animate-spin">⏳</span>}
+                {saveStatus === 'saved' && <span className="animate-bounce">✅</span>}
+                {saveStatus === 'unsaved' && <span className="animate-pulse">⚠️</span>}
+                <span>
+                  {saveStatus === 'saving' && 'Saving your changes...'}
+                  {saveStatus === 'saved' && 'All changes saved'}
+                  {saveStatus === 'unsaved' && 'You have unsaved changes'}
+                </span>
+              </div>
             </div>
           )}
           

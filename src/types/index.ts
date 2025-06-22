@@ -79,6 +79,8 @@ export interface UserProfile {
   profession: string
   location: string
   website: string
+  profilePictureUrl?: string
+  profilePicturePath?: string
   preferences: UserPreferences
   writingSettings: WritingSettings
   createdAt: Date

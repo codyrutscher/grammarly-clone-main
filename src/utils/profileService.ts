@@ -6,11 +6,19 @@ import {
   collection, 
   query, 
   where, 
-  getDocs 
+  getDocs, 
+  deleteDoc 
 } from 'firebase/firestore'
-import { db } from '../firebase'
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { db, storage } from '../firebase'
 import type { UserProfile, UserPreferences, WritingSettings } from '../types'
 import { defaultPreferences, defaultWritingSettings } from '../store/useProfileStore'
+import { getStorage, uploadBytesResumable } from 'firebase/storage'
+
+// Cloudinary configuration
+const CLOUDINARY_CLOUD_NAME = 'duclkixrz';
+const CLOUDINARY_UPLOAD_PRESET = 'Grammarly-clone'; // Your upload preset name
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 
 export const createUserProfile = async (
   uid: string, 
@@ -224,4 +232,186 @@ export const searchUserProfiles = async (searchTerm: string): Promise<UserProfil
     console.error('Error searching user profiles:', error)
     throw error
   }
-} 
+}
+
+// Profile picture upload functions
+export const uploadProfilePicture = async (
+  userId: string,
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<{ url: string; path: string }> => {
+  console.log('🚀 Starting profile picture upload for user:', userId);
+  
+  try {
+    // Try Cloudinary first
+    console.log('☁️ Attempting Cloudinary upload...');
+    const cloudinaryResult = await uploadToCloudinary(userId, file, onProgress);
+    console.log('✅ Cloudinary upload successful!');
+    return cloudinaryResult;
+  } catch (cloudinaryError) {
+    console.warn('⚠️ Cloudinary upload failed, falling back to localStorage:', cloudinaryError);
+    
+    // Fallback to localStorage
+    console.log('💾 Using localStorage fallback...');
+    const localStorageResult = await uploadToLocalStorage(userId, file, onProgress);
+    console.log('✅ localStorage upload successful!');
+    return localStorageResult;
+  }
+};
+
+// Cloudinary upload function
+const uploadToCloudinary = async (userId: string, file: File, onProgress?: (progress: number) => void): Promise<{ url: string; path: string }> => {
+  console.log('📤 Uploading to Cloudinary...');
+  
+  // Create FormData for Cloudinary upload
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('folder', 'profile-pictures'); // Organize files in folders
+  formData.append('public_id', `${userId}_avatar`); // Custom filename
+  formData.append('overwrite', 'true'); // Replace existing files
+  
+  // Simulate progress for user feedback
+  if (onProgress) {
+    onProgress(25);
+  }
+  
+  const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+    method: 'POST',
+    body: formData,
+  });
+  
+  if (onProgress) {
+    onProgress(75);
+  }
+  
+  if (!response.ok) {
+    throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+  }
+  
+  const result = await response.json();
+  
+  if (onProgress) {
+    onProgress(100);
+  }
+  
+  console.log('🎉 Cloudinary upload complete:', result.secure_url);
+  
+  return {
+    url: result.secure_url, // Cloudinary optimized URL
+    path: `cloudinary:${result.public_id}` // Store the public_id for future operations
+  };
+};
+
+// localStorage functions
+const uploadToLocalStorage = async (userId: string, file: File, onProgress?: (progress: number) => void): Promise<{ url: string; path: string }> => {
+  console.log('💾 Converting image to localStorage format...')
+  
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (event) => {
+      try {
+        const dataUrl = event.target?.result as string
+        const key = `profile_picture_${userId}`
+        
+        // Store in localStorage
+        localStorage.setItem(key, dataUrl)
+        console.log('✅ Image stored in localStorage')
+        
+        // Simulate progress for UI feedback
+        if (onProgress) {
+          onProgress(25)
+          setTimeout(() => onProgress(50), 100)
+          setTimeout(() => onProgress(75), 200)
+          setTimeout(() => onProgress(100), 300)
+        }
+        
+        resolve({
+          url: dataUrl, // Return the actual data URL for immediate display
+          path: `localStorage:${userId}` // Marker to indicate localStorage storage
+        })
+      } catch (error) {
+        console.error('❌ Error storing in localStorage:', error)
+        reject(error)
+      }
+    }
+    
+    reader.onerror = () => {
+      console.error('❌ Error reading file')
+      reject(new Error('Failed to read file'))
+    }
+    
+    reader.readAsDataURL(file)
+  })
+}
+
+export const deleteProfilePicture = async (userId: string, picturePath?: string): Promise<void> => {
+  console.log('🗑️ Deleting profile picture for user:', userId);
+  
+  try {
+    // Delete from localStorage
+    const localKey = `profile_picture_${userId}`;
+    localStorage.removeItem(localKey);
+    console.log('💾 Removed from localStorage');
+    
+    // Note: Cloudinary images are automatically overwritten when uploading 
+    // with the same public_id, so no explicit deletion needed for profile pictures
+    if (picturePath?.startsWith('cloudinary:')) {
+      console.log('☁️ Cloudinary image will be overwritten on next upload');
+    }
+    
+    console.log('✅ Profile picture deletion completed');
+  } catch (error) {
+    console.error('❌ Error deleting profile picture:', error);
+    throw error;
+  }
+};
+
+export const loadProfilePictureFromStorage = (userId: string): string | null => {
+  try {
+    const key = `profile_picture_${userId}`;
+    const storedImage = localStorage.getItem(key);
+    if (storedImage) {
+      console.log('📱 Found profile picture in localStorage');
+      return storedImage;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error loading from localStorage:', error);
+    return null;
+  }
+};
+
+export const updateProfileWithPicture = async (
+  userId: string,
+  profileData: Partial<UserProfile>,
+  file?: File,
+  onProgress?: (progress: number) => void
+): Promise<void> => {
+  console.log('🔄 Starting profile update with picture for user:', userId);
+  
+  try {
+    let finalProfileData = { ...profileData };
+    
+    if (file) {
+      console.log('📸 File provided, uploading picture...');
+      const uploadResult = await uploadProfilePicture(userId, file, onProgress);
+      
+      // For localStorage, we DON'T save the large base64 URL to Firestore
+      // Instead, we just save a small marker indicating we have a local image
+      finalProfileData.profilePictureUrl = 'localStorage'; // Small marker, not the actual data
+      finalProfileData.profilePicturePath = uploadResult.path; // localStorage:userId
+      console.log('💾 Using localStorage marker in profile');
+    }
+    
+    // Update profile in Firestore (without large image data)
+    console.log('📝 Updating profile in Firestore...');
+    await updateUserProfile(userId, finalProfileData);
+    console.log('✅ Profile updated successfully!');
+    
+  } catch (error) {
+    console.error('❌ Error updating profile with picture:', error);
+    throw new Error('Failed to update profile');
+  }
+}; 

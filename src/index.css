@@ -154,3 +154,24 @@ html {
     background-color: rgba(17, 24, 39, 0.9);
   }
 }
+
+/* Add placeholder styles for empty contentEditable */
+[contenteditable]:empty:before {
+  content: attr(data-placeholder);
+  color: rgb(156, 163, 175); /* gray-400 */
+  font-style: italic;
+  pointer-events: none;
+}
+
+[contenteditable]:empty:focus:before {
+  color: rgb(107, 114, 128); /* gray-500 */
+}
+
+/* Dark mode placeholder */
+.dark [contenteditable]:empty:before {
+  color: rgb(107, 114, 128); /* gray-500 in dark mode */
+}
+
+.dark [contenteditable]:empty:focus:before {
+  color: rgb(156, 163, 175); /* gray-400 in dark mode */
+}

@@ -80,8 +80,10 @@ const restoreCursorPosition = (element: HTMLElement, offset: number): void => {
     try {
       range.setStart(result.node, Math.min(result.offset, result.node.textContent?.length || 0));
       range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
     } catch (e) {
       console.warn('Could not restore cursor position:', e);
     }
@@ -316,7 +318,7 @@ useEffect(() => {
     if (editorRef.current && editorRef.current.innerText !== currentDocument.content) {
       // Save cursor position
       const selection = window.getSelection();
-      const range = selection?.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
       const offset = range ? range.startOffset : 0;
       
       // Set content
@@ -328,8 +330,10 @@ useEffect(() => {
           const newRange = document.createRange();
           newRange.setStart(editorRef.current.firstChild, Math.min(offset, editorRef.current.innerText.length));
           newRange.collapse(true);
-          selection?.removeAllRanges();
-          selection?.addRange(newRange);
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
         } catch (e) {
           // Ignore cursor restoration errors
         }
@@ -515,7 +519,7 @@ useEffect(() => {
       
       // Get cursor position before any updates
       const selection = window.getSelection();
-      const cursorOffset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : 0;
+      const cursorOffset = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).startOffset : 0;
       
       // Get the current text
       const element = e.currentTarget;
@@ -1097,6 +1101,7 @@ useEffect(() => {
   }`}
   contentEditable={isDocumentEditable ? "true" : "false"}
   ref={editorRef}
+  data-placeholder="Start writing or paste your text here... Use AI suggestions to improve your writing ✨"
   onInput={(e) => {
     // Prevent React from interfering
     e.persist?.();
@@ -1129,7 +1134,9 @@ useEffect(() => {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     minHeight: '100vh',
     backgroundColor: 'transparent',
-    outline: 'none'
+    outline: 'none',
+    color: isDarkMode ? '#ffffff' : '#111827',
+    caretColor: isDarkMode ? '#ffffff' : '#111827'
   }}
 />
 

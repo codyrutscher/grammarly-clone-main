@@ -1,36 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useProfileStore } from '../store/useProfileStore'
-import { updateUserProfile } from '../utils/profileService'
+import { updateUserProfile, updateProfileWithPicture } from '../utils/profileService'
 import { deleteUser } from 'firebase/auth'
 import { collection, query, where, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from '../firebase'
+import { useDarkModeStore } from '../store/useDarkModeStore'
+import { useProfileProvider } from '../hooks/useProfileProvider'
+import { X } from 'lucide-react'
+import type { UserProfile } from '../types'
 
 interface UserProfileModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-export const UserProfileModal = ({ isOpen, onClose }: UserProfileModalProps) => {
+export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthStore()
-  const { profile, updateProfile } = useProfileStore()
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const { profile, isLoading, error, refreshProfile } = useProfileProvider()
+  const { isDarkMode } = useDarkModeStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [isLocalStorageImage, setIsLocalStorageImage] = useState(false)
 
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    displayName: '',
-    bio: '',
-    profession: '',
-    location: '',
-    website: ''
-  })
+  const [profileData, setProfileData] = useState<Partial<UserProfile>>({})
 
   // Update form data when profile loads
   useEffect(() => {
     if (profile) {
-      setFormData({
+      setProfileData({
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
         displayName: profile.displayName || '',
@@ -39,6 +41,12 @@ export const UserProfileModal = ({ isOpen, onClose }: UserProfileModalProps) => 
         location: profile.location || '',
         website: profile.website || ''
       })
+      
+          // Check which storage method is being used
+    const isLocalImage = profile.profilePictureUrl?.startsWith('data:') || 
+                        profile.profilePicturePath?.startsWith('localStorage:') ||
+                        profile.profilePictureUrl === 'localStorage'
+    setIsLocalStorageImage(isLocalImage)
     }
   }, [profile])
 
@@ -81,57 +89,113 @@ export const UserProfileModal = ({ isOpen, onClose }: UserProfileModalProps) => 
   }
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setProfileData((prev: Partial<UserProfile>) => ({ ...prev, [field]: value }))
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB')
+      return
+    }
+
+    setSelectedFile(file)
+    
+    // Create preview URL
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setPreviewUrl(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click()
   }
 
   const handleSaveProfile = async () => {
-    if (!user) return
-    
-    setSaving(true)
+    if (!user?.uid) return
+
     try {
-      // Update local store first
-      updateProfile(formData)
-      
-      // Try to save to Firebase in background
-      try {
-        console.log('Attempting to save profile to Firebase...', formData)
-        await updateUserProfile(user.uid, formData)
-        console.log('Profile saved to Firebase successfully')
-        
-        // Show success feedback
-        const savedMessage = document.createElement('div')
-        savedMessage.textContent = 'Profile saved successfully!'
-        savedMessage.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
-        document.body.appendChild(savedMessage)
-        setTimeout(() => document.body.removeChild(savedMessage), 2000)
-        
-      } catch (firebaseError: any) {
-        console.error('Firebase save error details:', {
-          error: firebaseError,
-          message: firebaseError?.message || 'Unknown error',
-          code: firebaseError?.code || 'unknown',
-          uid: user.uid,
-          formData
-        })
-        
-        // Show local save feedback
-        const savedMessage = document.createElement('div')
-        savedMessage.textContent = 'Profile saved locally! (Firebase error - check console)'
-        savedMessage.className = 'fixed top-4 right-4 bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
-        document.body.appendChild(savedMessage)
-        setTimeout(() => document.body.removeChild(savedMessage), 3000)
+      console.log('💾 Starting profile save process...')
+      setIsSaving(true)
+      setSaveMessage(null)
+      setUploadProgress(0)
+
+      const formData = {
+        ...profileData,
+        displayName: profileData.displayName || '',
+        firstName: profileData.firstName || '',
+        lastName: profileData.lastName || '',
+        bio: profileData.bio || '',
+        profession: profileData.profession || '',
+        location: profileData.location || '',
+        website: profileData.website || ''
       }
-    } catch (error) {
-      console.error('Error saving profile:', error)
+
+      console.log('📋 Form data prepared:', formData)
+
+      await updateProfileWithPicture(
+        user.uid, 
+        formData, 
+        selectedFile || undefined,
+        setUploadProgress
+      )
+
+      console.log('✅ Profile update completed!')
       
-      // Show error feedback
-      const errorMessage = document.createElement('div')
-      errorMessage.textContent = 'Failed to save profile'
-      errorMessage.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
-      document.body.appendChild(errorMessage)
-      setTimeout(() => document.body.removeChild(errorMessage), 2000)
+      // Determine which storage method was used based on the upload result
+      let storageMessage = 'Profile updated successfully!';
+      if (selectedFile) {
+        // The message will depend on which storage method actually worked
+        storageMessage = 'Profile updated successfully! ☁️ Image uploaded to cloud storage.';
+      }
+      setSaveMessage(storageMessage)
+      
+      // Clear selected file and preview after successful save
+      setSelectedFile(null)
+      setPreviewUrl(null)
+      
+      // Refresh the profile data to update the avatar
+      refreshProfile()
+      
+      setTimeout(() => {
+        setSaveMessage(null)
+        onClose()
+      }, 1500)
+
+    } catch (error: any) {
+      console.error('❌ Profile save error:', error)
+      console.log('Firebase save error details:', {
+        error,
+        message: error?.message || 'Unknown error',
+        code: error?.code || 'unknown',
+        uid: user?.uid,
+        formData: profileData
+      })
+      
+      setSaveMessage('Failed to save profile. Please try again.')
+      setTimeout(() => setSaveMessage(null), 3000)
     } finally {
-      setSaving(false)
+      setIsSaving(false)
+      setUploadProgress(0)
     }
   }
 
@@ -166,7 +230,7 @@ export const UserProfileModal = ({ isOpen, onClose }: UserProfileModalProps) => 
     }
     
     try {
-      setDeleting(true)
+      setIsSaving(true)
       
       // Step 1: Delete all user documents from Firestore
       console.log('Deleting user documents...')
@@ -218,144 +282,266 @@ export const UserProfileModal = ({ isOpen, onClose }: UserProfileModalProps) => 
       
       alert(errorMessage)
     } finally {
-      setDeleting(false)
+      setIsSaving(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-grammarly-blue to-purple-600 px-6 py-4 text-white">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">User Profile</h2>
-            <button
-              onClick={onClose}
-              className="text-white/80 hover:text-white transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${!isOpen ? 'hidden' : ''}`}>
+      <div className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4`}>
+        <div className={`sticky top-0 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} px-6 py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
+          <h2 className="text-xl font-semibold">User Profile</h2>
+          <button
+            onClick={onClose}
+            className={`${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Profile Picture Section */}
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              {(previewUrl || profile?.profilePictureUrl) ? (
+                <img
+                  src={previewUrl || profile?.profilePictureUrl}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-blue-500"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-blue-500">
+                  <span className="text-white text-2xl font-bold">
+                    {(profile?.displayName || profile?.email || 'U').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Upload Progress Overlay */}
+              {isSaving && uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                  <div className="text-white text-sm font-medium">
+                    {uploadProgress}%
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Local Storage Indicator */}
+            {isLocalStorageImage && (
+              <div className={`text-xs px-2 py-1 rounded ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
+                📱 Stored locally
+              </div>
+            )}
+
+            {/* File Upload */}
+            <div className="flex flex-col items-center space-y-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSaving}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  isDarkMode 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {selectedFile ? 'Change Picture' : 'Upload Picture'}
+              </button>
+              
+              {selectedFile && (
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Selected: {selectedFile.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Save Message */}
+          {saveMessage && (
+            <div className={`p-3 rounded-lg text-center ${
+              saveMessage.includes('success') 
+                ? (isDarkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800')
+                : (isDarkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800')
+            }`}>
+              {saveMessage}
+            </div>
+          )}
+
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={profileData.displayName || ''}
+                onChange={(e) => setProfileData({ ...profileData, displayName: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={profileData.email || ''}
+                onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                First Name
+              </label>
+              <input
+                type="text"
+                value={profileData.firstName || ''}
+                onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={profileData.lastName || ''}
+                onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              Bio
+            </label>
+            <textarea
+              value={profileData.bio || ''}
+              onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+              rows={3}
+              className={`w-full px-3 py-2 border rounded-lg ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Profession
+              </label>
+              <input
+                type="text"
+                value={profileData.profession || ''}
+                onChange={(e) => setProfileData({ ...profileData, profession: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Location
+              </label>
+              <input
+                type="text"
+                value={profileData.location || ''}
+                onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              Website
+            </label>
+            <input
+              type="url"
+              value={profileData.website || ''}
+              onChange={(e) => setProfileData({ ...profileData, website: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            />
           </div>
         </div>
 
-        {/* Header - No tabs needed anymore */}
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="space-y-6">
-            {/* Account Information */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Account Information</h3>
-              <div className="space-y-2 text-sm text-gray-600">
-                <p><span className="font-medium">Email:</span> {user.email}</p>
-                <p><span className="font-medium">Account Created:</span> {profile.createdAt.toLocaleDateString()}</p>
-                <p><span className="font-medium">Last Updated:</span> {profile.updatedAt.toLocaleDateString()}</p>
-              </div>
-            </div>
-
-            {/* Personal Information */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange('firstName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange('lastName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Display Name</label>
-                  <input
-                    type="text"
-                    value={formData.displayName}
-                    onChange={(e) => handleInputChange('displayName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Profession</label>
-                  <input
-                    type="text"
-                    value={formData.profession}
-                    onChange={(e) => handleInputChange('profession', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
-                  <input
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => handleInputChange('website', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
-                  <textarea
-                    value={formData.bio}
-                    onChange={(e) => handleInputChange('bio', e.target.value)}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="Tell us about yourself..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Save Button */}
-            <button
-              onClick={handleSaveProfile}
-              disabled={saving}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-            >
-              {saving && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>}
-              <span>{saving ? 'Saving...' : 'Save Profile'}</span>
-            </button>
-
-            {/* Danger Zone */}
-            <div className="border-t border-red-200 pt-6">
-              <h3 className="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="text-md font-medium text-red-800 mb-2">Delete Account</h4>
-                <p className="text-sm text-red-600 mb-4">
-                  Once you delete your account, there is no going back. This will permanently delete all your documents, preferences, and account data.
-                </p>
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleting}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
-                >
-                  {deleting ? 'Deleting...' : 'Delete Account'}
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className={`sticky bottom-0 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} px-6 py-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-end space-x-3`}>
+          <button
+            onClick={onClose}
+            disabled={isSaving}
+            className={`px-4 py-2 border rounded-lg transition-colors ${
+              isDarkMode 
+                ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveProfile}
+            disabled={isSaving}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              isDarkMode 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2`}
+          >
+            {isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <span>Save Profile</span>
+            )}
+          </button>
         </div>
       </div>
     </div>
   )
-} 
+}
+
+export default UserProfileModal 

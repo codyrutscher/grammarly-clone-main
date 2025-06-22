@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile pictures - users can upload/read/delete their own profile pictures
+    match /profile-pictures/{userId}/{allPaths=**} {
+      // Allow authenticated users to manage their own profile pictures
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      
+      // Validate file size (max 5MB) and type (images only)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024  // 5MB limit
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Allow reading profile pictures for all authenticated users (for viewing other users' avatars)
+    match /profile-pictures/{userId}/avatar.{extension} {
+      allow read: if request.auth != null;
+    }
+    
+    // Deny all other storage access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

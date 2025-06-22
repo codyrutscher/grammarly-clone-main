@@ -123,9 +123,17 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ isOpen, onClose })
           {/* AI Analysis Section */}
           {isAnalyzing ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 animate-spin rounded-full border-4 border-blue-200 border-t-blue-500"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl">🤖</span>
+                </div>
+              </div>
+              <p className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 AI is analyzing your writing...
+              </p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} animate-pulse`}>
+                This usually takes a few seconds
               </p>
             </div>
           ) : aiAnalysis ? (

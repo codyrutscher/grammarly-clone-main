@@ -136,3 +136,33 @@ StudyWrite helps students achieve:
 🚀 **Try StudyWrite now:** https://grammarly-clone-for-gauntlet.web.app
 
 *Empowering students to write better, faster, and with confidence.*
+
+## Profile Pictures
+
+StudyWrite now supports profile pictures! Users can:
+
+- **Upload Profile Pictures**: Click on your profile avatar in the top navigation to open your profile settings
+- **Image Requirements**: 
+  - Supported formats: JPG, PNG, GIF, WebP
+  - Maximum file size: 5MB
+  - Square images work best for circular avatars
+- **Automatic Display**: Your profile picture will appear as a clickable avatar in the navigation bar
+- **Fallback Display**: If no profile picture is uploaded, your initials will be displayed in a gradient background
+
+### Setting up Firebase Storage (for developers)
+
+To enable profile picture uploads, Firebase Storage needs to be configured:
+
+1. Go to the [Firebase Console](https://console.firebase.google.com)
+2. Select your project
+3. Navigate to Storage in the left sidebar
+4. Click "Get Started" and follow the setup wizard
+5. Deploy storage rules: `firebase deploy --only storage:rules`
+
+The storage rules are already configured in `storage.rules` to allow:
+- Users to upload/manage their own profile pictures only
+- 5MB file size limit
+- Image files only
+- Secure access based on authentication
+
+## Features

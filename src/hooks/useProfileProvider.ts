@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useProfileStore } from '../store/useProfileStore'
-import { getUserProfile, createUserProfile } from '../utils/profileService'
+import { getUserProfile, createUserProfile, loadProfilePictureFromStorage } from '../utils/profileService'
 import type { UserProfile } from '../types'
 import { defaultPreferences, defaultWritingSettings } from '../store/useProfileStore'
 
@@ -22,48 +22,101 @@ const createDefaultProfile = (user: any): UserProfile => ({
 })
 
 export const useProfileProvider = () => {
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { user } = useAuthStore()
-  const { setProfile, setLoading, setError } = useProfileStore()
+  const { setProfile: setStoreProfile } = useProfileStore()
 
-  useEffect(() => {
-    if (!user) {
+  const loadProfile = useCallback(async () => {
+    if (!user?.uid) {
+      console.log('👤 No user found, clearing profile')
       setProfile(null)
+      setStoreProfile(null)
+      setIsLoading(false)
       return
     }
 
-    const loadUserProfile = async () => {
-      console.log('Loading profile for user:', user.uid)
-      setLoading(true)
+    try {
+      console.log('📖 Loading profile for user:', user.uid)
+      setIsLoading(true)
       setError(null)
-
-      try {
-        // First, try to load from Firebase
-        console.log('Attempting to load profile from Firebase')
-        const firebaseProfile = await getUserProfile(user.uid)
+      
+      const userProfile = await getUserProfile(user.uid)
+      
+      if (userProfile) {
+        console.log('✅ Profile loaded from Firestore')
         
-        if (firebaseProfile) {
-          console.log('Loaded existing profile from Firebase:', firebaseProfile)
-          setProfile(firebaseProfile)
+        // Handle profile pictures from different sources
+        let finalProfile = { ...userProfile };
+        
+        // Check if profile indicates localStorage storage
+        if (userProfile.profilePictureUrl === 'localStorage' || 
+            userProfile.profilePicturePath?.startsWith('localStorage:')) {
+          console.log('💾 Profile uses localStorage for picture, loading...');
+          const localImage = loadProfilePictureFromStorage(user.uid);
+          if (localImage) {
+            finalProfile.profilePictureUrl = localImage;
+            console.log('📱 Loaded profile picture from localStorage');
+          } else {
+            console.log('⚠️ localStorage marker found but no image stored, clearing markers');
+            finalProfile.profilePictureUrl = undefined;
+            finalProfile.profilePicturePath = undefined;
+          }
+        } else if (userProfile.profilePicturePath?.startsWith('cloudinary:')) {
+          // Cloudinary URLs are already stored correctly in profilePictureUrl
+          console.log('☁️ Using Cloudinary profile picture:', userProfile.profilePictureUrl);
         } else {
-          console.log('No existing profile found, creating new profile')
-          // No profile exists, create a new one
-          const newProfile = await createUserProfile(user.uid, user.email || '', user.displayName || '')
-          console.log('Created new profile:', newProfile)
-          setProfile(newProfile)
+          // Always check localStorage for images, even if not marked in Firestore
+          // This handles cases where user uploaded before we had proper markers
+          console.log('🔍 Checking localStorage for profile picture...');
+          const localImage = loadProfilePictureFromStorage(user.uid);
+          if (localImage) {
+            finalProfile.profilePictureUrl = localImage;
+            console.log('📱 Found profile picture in localStorage');
+          }
         }
-      } catch (error) {
-        console.error('Error loading/creating profile:', error)
-        setError('Failed to load profile')
         
-        // Fallback: create a local profile if Firebase fails
-        console.log('Creating fallback local profile')
-        const fallbackProfile = createDefaultProfile(user)
-        setProfile(fallbackProfile)
-      } finally {
-        setLoading(false)
+        setProfile(finalProfile)
+        setStoreProfile(finalProfile)
+      } else {
+        console.log('📝 No profile found, creating default profile')
+        const defaultProfile = await createUserProfile(
+          user.uid,
+          user.email || '',
+          user.displayName || user.email?.split('@')[0] || 'User'
+        )
+        
+        // Check for localStorage image for new profiles too
+        const localImage = loadProfilePictureFromStorage(user.uid);
+        if (localImage) {
+          defaultProfile.profilePictureUrl = localImage;
+          console.log('📱 Applied localStorage image to new profile');
+        }
+        
+        setProfile(defaultProfile)
+        setStoreProfile(defaultProfile)
       }
+    } catch (err: any) {
+      console.error('❌ Error loading profile:', err)
+      setError(err.message || 'Failed to load profile')
+    } finally {
+      setIsLoading(false)
     }
+  }, [user?.uid])
 
-    loadUserProfile()
-  }, [user, setProfile, setLoading, setError])
-} 
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  const refreshProfile = useCallback(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  return {
+    profile,
+    isLoading,
+    error,
+    refreshProfile
+  }
+}
