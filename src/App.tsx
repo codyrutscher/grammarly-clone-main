@@ -120,16 +120,29 @@ function App() {
           : 'bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50'
       }`}>
         {/* Background decorations */}
-        <div className="absolute inset-0 overflow-hidden z-0">
-          {/* Top section circles */}
-          <div className="absolute top-10 left-10 w-32 h-32 bg-blue-200 rounded-full opacity-20 animate-pulse z-0"></div>
-          <div className="absolute top-32 right-20 w-24 h-24 bg-purple-200 rounded-full opacity-20 animate-pulse z-0" style={{animationDelay: '1s'}}></div>
-          <div className="absolute top-16 left-1/3 w-20 h-20 bg-indigo-200 rounded-full opacity-15 animate-pulse z-0" style={{animationDelay: '0.5s'}}></div>
-          <div className="absolute top-8 right-1/3 w-16 h-16 bg-pink-200 rounded-full opacity-25 animate-pulse z-0" style={{animationDelay: '1.5s'}}></div>
+       {/* Enhanced Background */}
+       <div className="absolute inset-0 overflow-hidden z-0">
+          {/* Gradient Mesh Background */}
+          <div className="absolute inset-0">
+            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+            <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+          </div>
           
-          {/* Additional scattered circles */}
-          <div className="absolute top-3/4 left-1/5 w-14 h-14 bg-sky-200 rounded-full opacity-19 animate-pulse z-0" style={{animationDelay: '5s'}}></div>
-          <div className="absolute top-1/4 right-1/5 w-30 h-30 bg-fuchsia-200 rounded-full opacity-14 animate-pulse z-0" style={{animationDelay: '5.5s'}}></div>
+          {/* Floating Elements */}
+          <div className="absolute top-20 left-10 text-4xl opacity-10 animate-float">📝</div>
+          <div className="absolute top-40 right-20 text-3xl opacity-10 animate-float animation-delay-1000">📚</div>
+          <div className="absolute bottom-40 left-20 text-3xl opacity-10 animate-float animation-delay-2000">🎓</div>
+          <div className="absolute top-60 left-1/3 text-2xl opacity-10 animate-float animation-delay-3000">✍️</div>
+          <div className="absolute bottom-60 right-1/3 text-4xl opacity-10 animate-float animation-delay-4000">⭐</div>
+          
+          {/* Grid Pattern Overlay */}
+          <div 
+            className="absolute inset-0 opacity-[0.02]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }}
+          />
         </div>
 
         {/* Header */}
@@ -173,60 +186,164 @@ function App() {
         </nav>
 
         {/* Hero Section */}
+        {/* Hero Section */}
         <div className="py-20 px-4 relative z-10">
-          <div className="text-center max-w-5xl mx-auto">
-            {/* Animated hero content */}
-            <div className="space-y-8 animate-fade-in-up">
-              <div className="space-y-6">
-                <h1 className={`text-5xl lg:text-7xl font-bold leading-tight transition-colors ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
-                  <span className="block">Write, improve,</span>
-                  <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent animate-gradient">
-                    succeed
-                  </span>
-                </h1>
+          <div className="max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left side - Text content */}
+              <div className="space-y-8 animate-fade-in-up text-center lg:text-left">
+                {/* Trust badges */}
+                <div className="flex flex-wrap gap-4 justify-center lg:justify-start items-center">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+                    isDarkMode ? 'bg-gray-800/50 text-gray-300' : 'bg-white/70 text-gray-700'
+                  }`}>
+                    <span className="text-yellow-500">⭐</span>
+                    <span>4.8/5 from 10,000+ students</span>
+                  </div>
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+                    isDarkMode ? 'bg-gray-800/50 text-gray-300' : 'bg-white/70 text-gray-700'
+                  }`}>
+                    <span className="text-green-500">✓</span>
+                    <span>Used by top universities</span>
+                  </div>
+                </div>
                 
-                <p className={`text-xl lg:text-2xl max-w-4xl mx-auto leading-relaxed transition-colors ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
-                  AI-powered writing assistant designed for students. Get real-time suggestions, 
-                  academic style support, and comprehensive writing analysis.
-                </p>
+                <div className="space-y-6">
+                  <h1 className={`text-5xl lg:text-7xl xl:text-8xl font-bold leading-tight transition-colors ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    <span className="block">Write, improve,</span>
+                    <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent animate-gradient bg-300% animate-gradient-x">
+                      succeed
+                    </span>
+                  </h1>
+                  
+                  <p className={`text-xl lg:text-2xl max-w-xl leading-relaxed transition-colors ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                  }`}>
+                    AI-powered writing assistant designed for students. Get real-time suggestions, 
+                    academic style support, and comprehensive writing analysis.
+                  </p>
+                </div>
+                
+                {/* CTA Buttons with glow effect */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center pt-4">
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                    <button
+                      onClick={() => setShowSignupPage(true)}
+                      className="relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl text-lg font-semibold transition-all duration-300 hover:scale-105 animate-float"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>Start Writing Better</span>
+                        <svg className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </span>
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowVideoModal(true)}
+                    className={`group px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 hover:scale-105 backdrop-blur-md ${
+                      isDarkMode 
+                        ? 'bg-gray-800/30 text-white border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50' 
+                        : 'bg-white/30 text-gray-900 border border-gray-200 hover:border-gray-300 hover:bg-white/50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                      <span>Watch Demo</span>
+                    </span>
+                  </button>
+                </div>
+                
+                {/* Live stats */}
+                <div className="flex flex-wrap gap-6 pt-4 justify-center lg:justify-start">
+                  <div className="text-center lg:text-left">
+                    <div className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <span className="animate-count">500K+</span>
+                    </div>
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Essays Improved</div>
+                  </div>
+                  <div className="text-center lg:text-left">
+                    <div className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <span className="animate-count">95%</span>
+                    </div>
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Better Grades</div>
+                  </div>
+                  <div className="text-center lg:text-left">
+                    <div className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <span className="animate-count">24/7</span>
+                    </div>
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>AI Support</div>
+                  </div>
+                </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
-                <button
-                  onClick={() => setShowSignupPage(true)}
-                  className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl text-lg font-semibold transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105"
-                >
-                  <span className="relative z-10 flex items-center gap-2">
-                    <span>Start Writing Better</span>
-                    <svg className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-700 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </button>
+              {/* Right side - Interactive Demo */}
+              <div className="relative animate-fade-in-up animation-delay-300">
+                <div className={`relative rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md border ${
+                  isDarkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-white/70 border-gray-200'
+                }`}>
+                  {/* Browser mockup header */}
+                  <div className={`flex items-center gap-2 px-4 py-3 border-b ${
+                    isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50/50 border-gray-200'
+                  }`}>
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div className={`flex-1 text-center text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      StudyWrite Editor
+                    </div>
+                  </div>
+                  
+                  {/* Live typing demo */}
+                  <div className="p-6 space-y-4">
+                    <div className={`font-mono text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>The impact of climate change on </span>
+                      <span className="relative">
+                        <span className="text-red-500 line-through">enviroment</span>
+                        <span className="absolute -bottom-6 left-0 text-sm bg-green-100 text-green-700 px-2 py-1 rounded shadow-sm whitespace-nowrap">
+                          ✓ environment
+                        </span>
+                      </span>
+                      <span> is one of the most pressing issues...</span>
+                    </div>
+                    
+                    <div className="flex gap-2 flex-wrap">
+                      <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                        Grammar: Excellent
+                      </div>
+                      <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">
+                        Style: Academic
+                      </div>
+                      <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                        Clarity: 92%
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
-                <button
-                  onClick={() => setShowVideoModal(true)}
-                  className={`group px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 hover:scale-105 ${
-                    isDarkMode 
-                      ? 'bg-gray-800/50 text-white border border-gray-700 hover:border-gray-600' 
-                      : 'bg-white/50 text-gray-900 border border-gray-200 hover:border-gray-300 shadow-lg'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                    <span>Watch Demo</span>
-                  </span>
-                </button>
+                {/* Floating feature cards */}
+                <div className="absolute -top-4 -right-4 bg-gradient-to-br from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg shadow-lg animate-float animation-delay-1000">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span>🚀</span>
+                    <span>Real-time AI</span>
+                  </div>
+                </div>
+                
+                <div className="absolute -bottom-4 -left-4 bg-gradient-to-br from-purple-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg animate-float animation-delay-2000">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span>📊</span>
+                    <span>Instant Analysis</span>
+                  </div>
+                </div>
               </div>
-              
-              
             </div>
           </div>
         </div>
@@ -328,16 +445,18 @@ function App() {
                 <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Export to Word, PDF, or Google Docs with one click</p>
               </div>
               
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4 ${
-                isDarkMode ? 'bg-orange-900/50' : 'bg-orange-100'
-              }`}>
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
+              <div className="text-center p-6">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4 ${
+                  isDarkMode ? 'bg-orange-900/50' : 'bg-orange-100'
+                }`}>
+                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Citation Generator</h3>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manually create professional citations in APA, MLA, Chicago, and Harvard formats</p>
               </div>
-              <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Citation Generator</h3>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manually create professional citations in APA, MLA, Chicago, and Harvard formats</p>
-            </div>
+              </div>
           </div>
         </div>
 
