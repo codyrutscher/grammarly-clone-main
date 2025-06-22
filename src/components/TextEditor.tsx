@@ -31,6 +31,145 @@ const mapGrammarSuggestionToSuggestion = (grammarSuggestion: GrammarSuggestion):
   };
 };
 
+// Helper function to get cursor offset in plain text
+const getCursorOffset = (element: HTMLElement): number => {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return 0;
+  
+  const range = selection.getRangeAt(0);
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(element);
+  preCaretRange.setEnd(range.endContainer, range.endOffset);
+  
+  // Get the text content length
+  const div = document.createElement('div');
+  div.appendChild(preCaretRange.cloneContents());
+  return div.innerText.length;
+};
+
+// Helper function to restore cursor position
+const restoreCursorPosition = (element: HTMLElement, offset: number): void => {
+  const selection = window.getSelection();
+  if (!selection) return;
+  
+  const range = document.createRange();
+  let currentOffset = 0;
+  
+  // Use a more specific type for the result
+  const findTextNode = (n: Node, targetOffset: number): { node: Text; offset: number } | null => {
+    if (n.nodeType === Node.TEXT_NODE) {
+      const textLength = n.textContent?.length || 0;
+      if (currentOffset + textLength >= targetOffset) {
+        return { node: n as Text, offset: targetOffset - currentOffset };
+      }
+      currentOffset += textLength;
+    } else if (n.nodeType === Node.ELEMENT_NODE) {
+      for (let i = 0; i < n.childNodes.length; i++) {
+        const result = findTextNode(n.childNodes[i], targetOffset);
+        if (result) {
+          return result;
+        }
+      }
+    }
+    return null;
+  };
+  
+  const result = findTextNode(element, offset);
+  
+  if (result) {
+    try {
+      range.setStart(result.node, Math.min(result.offset, result.node.textContent?.length || 0));
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (e) {
+      console.warn('Could not restore cursor position:', e);
+    }
+  }
+};
+
+// Function to apply highlights to text with inline styles
+const applyHighlights = (text: string, suggestions: Suggestion[], isDarkMode: boolean): string => {
+  if (!suggestions || suggestions.length === 0) {
+    return text.replace(/\n/g, '<br>');
+  }
+
+  // Define inline styles for each suggestion type
+  const getInlineStyle = (type: string, isDarkMode: boolean) => {
+    const styles = {
+      grammar: {
+        backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(254, 202, 202, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#f87171' : '#ef4444'}`,
+        textDecoration: 'underline wavy #ef4444',
+        color: 'inherit'
+      },
+      spelling: {
+        backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(254, 202, 202, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#f87171' : '#ef4444'}`,
+        textDecoration: 'underline wavy #ef4444',
+        color: 'inherit'
+      },
+      style: {
+        backgroundColor: isDarkMode ? 'rgba(139, 92, 246, 0.3)' : 'rgba(221, 214, 254, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#a78bfa' : '#8b5cf6'}`,
+        textDecoration: 'underline wavy #8b5cf6',
+        color: 'inherit'
+      },
+      readability: {
+        backgroundColor: isDarkMode ? 'rgba(249, 115, 22, 0.3)' : 'rgba(254, 215, 170, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#fb923c' : '#f97316'}`,
+        textDecoration: 'underline wavy #f97316',
+        color: 'inherit'
+      },
+      structure: {
+        backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(187, 247, 208, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#34d399' : '#10b981'}`,
+        textDecoration: 'underline wavy #10b981',
+        color: 'inherit'
+      },
+      tone: {
+        backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(254, 240, 138, 0.7)',
+        borderBottom: `3px solid ${isDarkMode ? '#fbbf24' : '#f59e0b'}`,
+        textDecoration: 'underline wavy #f59e0b',
+        color: 'inherit'
+      }
+    };
+    
+    const style = styles[type as keyof typeof styles] || styles.style;
+    return Object.entries(style)
+      .map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${value}`)
+      .join('; ');
+  };
+
+  // Sort suggestions by start position in descending order to avoid index shifting
+  const sortedSuggestions = [...suggestions].sort((a, b) => b.startIndex - a.startIndex);
+  
+  let highlightedText = text;
+  
+  sortedSuggestions.forEach(suggestion => {
+    const start = suggestion.startIndex;
+    const end = suggestion.endIndex;
+    
+    if (start >= 0 && end <= text.length && start < end) {
+      const beforeText = highlightedText.slice(0, start);
+      const suggestionText = highlightedText.slice(start, end);
+      const afterText = highlightedText.slice(end);
+      
+      // Create a short tooltip text
+      const tooltip = suggestion.message.length > 50 
+        ? suggestion.message.substring(0, 47) + '...' 
+        : suggestion.message;
+      
+      const inlineStyle = getInlineStyle(suggestion.type, isDarkMode);
+      
+      highlightedText = `${beforeText}<span class="suggestion-highlight ${suggestion.type}" style="${inlineStyle}; cursor: pointer; position: relative; display: inline-block; padding: 1px 2px; border-radius: 3px;" data-suggestion-id="${suggestion.id}" data-tooltip="${tooltip.replace(/"/g, '&quot;')}">${suggestionText}</span>${afterText}`;
+    }
+  });
+  
+  // Replace newlines with <br> tags
+  return highlightedText.replace(/\n/g, '<br>');
+};
+
 export function TextEditor() {
   const { user } = useAuthStore();
   const { currentDocument, suggestions, setSuggestions, setCurrentDocument, updateDocument, addDocument } = useDocumentStore();
@@ -58,6 +197,7 @@ export function TextEditor() {
   const [showImportExport, setShowImportExport] = useState(false);
   const lastAutoSaveTime = useRef<number>(0);
   const currentDocumentId = useRef<string | null>(null);
+  const isApplyingHighlights = useRef(false);
 
   const addFeedback = useSuggestionFeedbackStore(state => state.addFeedback);
 
@@ -163,10 +303,18 @@ export function TextEditor() {
       console.log('📝 Setting content:', currentDocument.content);
       setContent(currentDocument.content);
       
-      // Update the editor content using innerText
-      if (editorRef.current && editorRef.current.innerText !== currentDocument.content) {
-        editorRef.current.innerText = currentDocument.content;
-      }
+              // Update the editor content
+        if (editorRef.current) {
+          if (suggestions.length > 0 && !isNewDocument) {
+            // Apply highlights if there are suggestions
+            editorRef.current.innerHTML = applyHighlights(currentDocument.content, suggestions, isDarkMode);
+            editorRef.current.classList.add('with-highlights');
+          } else {
+            // Otherwise, just set the text
+            editorRef.current.innerText = currentDocument.content;
+            editorRef.current.classList.remove('with-highlights');
+          }
+        }
       
       // ONLY clear suggestions when switching to a DIFFERENT document
       if (isNewDocument) {
@@ -178,6 +326,35 @@ export function TextEditor() {
       }
     }
   }, [currentDocument, setSuggestions]);
+
+  // Apply highlights when suggestions change
+  useEffect(() => {
+    if (editorRef.current && content && !isApplyingHighlights.current) {
+      isApplyingHighlights.current = true;
+      
+      // Save cursor position
+      const cursorOffset = getCursorOffset(editorRef.current);
+      
+      if (suggestions.length > 0) {
+        // Apply highlights
+        const highlightedHTML = applyHighlights(content, suggestions, isDarkMode);
+        editorRef.current.innerHTML = highlightedHTML;
+        editorRef.current.classList.add('with-highlights');
+      } else {
+        // Remove highlights
+        editorRef.current.innerText = content;
+        editorRef.current.classList.remove('with-highlights');
+      }
+      
+      // Restore cursor position
+      setTimeout(() => {
+        if (editorRef.current) {
+          restoreCursorPosition(editorRef.current, cursorOffset);
+        }
+        isApplyingHighlights.current = false;
+      }, 0);
+    }
+  }, [suggestions, content]);
 
   const handleCreateNewDocument = async () => {
     if (!user) return;
@@ -211,13 +388,35 @@ export function TextEditor() {
       content.slice(mappedSuggestion.endIndex);
     
     setContent(newContent);
-    if (editorRef.current) {
-      editorRef.current.innerText = newContent;
-    }
     updateDocument(currentDocument.id, { content: newContent });
     
-    // Remove the applied suggestion
-    setSuggestions(suggestions.filter(s => s.id !== mappedSuggestion.id));
+    // Remove the applied suggestion and update remaining suggestions
+    const remainingSuggestions = suggestions.filter(s => s.id !== mappedSuggestion.id);
+    setSuggestions(remainingSuggestions);
+    
+    // Update the editor with highlighting for remaining suggestions
+    if (editorRef.current) {
+      if (remainingSuggestions.length > 0) {
+        // Update positions of remaining suggestions based on the text change
+        const lengthChange = mappedSuggestion.suggestion.length - mappedSuggestion.originalText.length;
+        const updatedSuggestions = remainingSuggestions.map(s => {
+          if (s.startIndex > mappedSuggestion.endIndex) {
+            return {
+              ...s,
+              startIndex: s.startIndex + lengthChange,
+              endIndex: s.endIndex + lengthChange
+            };
+          }
+          return s;
+        });
+        setSuggestions(updatedSuggestions);
+        editorRef.current.innerHTML = applyHighlights(newContent, updatedSuggestions, isDarkMode);
+        editorRef.current.classList.add('with-highlights');
+      } else {
+        editorRef.current.innerText = newContent;
+        editorRef.current.classList.remove('with-highlights');
+      }
+    }
     
     // Add to feedback store
     addFeedback({
@@ -323,19 +522,64 @@ export function TextEditor() {
     console.log('🔍 === END SUGGESTIONS STATE CHANGE ===\n');
   }, [suggestions, hasGeneratedSuggestions]);
 
-  // Fixed handleInput to work with plain text
+    // Fixed handleInput to work with highlighted text
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    if (!currentDocument) return;
-    
-    // Get the text content, not innerHTML
+    if (!currentDocument || isApplyingHighlights.current) return;
+     
+    // Get the plain text content (this strips HTML but preserves the actual text)
     const newContent = e.currentTarget.innerText || '';
     
     // Only update if content actually changed
     if (newContent !== content) {
       setContent(newContent);
       updateDocument(currentDocument.id, { content: newContent });
+      
+      // Clear suggestions when user edits text, as positions may have changed
+      if (suggestions.length > 0) {
+        setSuggestions([]);
+        setHasGeneratedSuggestions(false);
+      }
     }
   };
+
+  // Handle click on highlighted suggestions
+  useEffect(() => {
+    const handleHighlightClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('suggestion-highlight')) {
+        const suggestionId = target.getAttribute('data-suggestion-id');
+        if (suggestionId) {
+          const suggestion = suggestions.find(s => s.id === suggestionId);
+          if (suggestion) {
+            // Convert Suggestion to GrammarSuggestion format
+            const grammarSuggestion: GrammarSuggestion = {
+              id: suggestion.id,
+              type: suggestion.type,
+              start: suggestion.startIndex,
+              end: suggestion.endIndex,
+              original: suggestion.originalText,
+              originalText: suggestion.originalText,
+              suggestion: suggestion.suggestion,
+              message: suggestion.message,
+              explanation: suggestion.explanation,
+              severity: suggestion.severity,
+              startIndex: suggestion.startIndex,
+              endIndex: suggestion.endIndex
+            };
+            setSelectedSuggestion(grammarSuggestion);
+          }
+        }
+      }
+    };
+
+    const editor = editorRef.current;
+    if (editor) {
+      editor.addEventListener('click', handleHighlightClick);
+      return () => {
+        editor.removeEventListener('click', handleHighlightClick);
+      };
+    }
+  }, [suggestions]);
 
   // Handle key press events for better control
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -538,18 +782,7 @@ export function TextEditor() {
               Or select an existing document from the sidebar
             </div>
             
-            {!showDocumentSidebar && (
-              <button
-                onClick={() => setShowDocumentSidebar(true)}
-                className={`mt-4 px-4 py-2 text-sm border rounded-lg font-medium transition-colors ${
-                  isDarkMode 
-                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500' 
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                }`}
-              >
-                📁 Show Documents
-              </button>
-            )}
+          
           </div>
         </div>
       </div>
@@ -772,17 +1005,7 @@ export function TextEditor() {
                     🔍 Plagiarism Check
                   </button>
                   
-                  <button
-                    onClick={() => setShowAnalysis(true)}
-                    className={`px-4 py-2 text-sm border rounded-lg font-medium transition-colors ${
-                      isDarkMode 
-                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500' 
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                    }`}
-                    title="Advanced Analysis"
-                  >
-                    📈 Analysis
-                  </button>
+                 
                   
                   <button
                     onClick={() => setShowImportExport(true)}
@@ -874,7 +1097,7 @@ export function TextEditor() {
             {/* Editor Container */}
             <div className="flex-1 p-6">
               <div className="relative">
-                {/* Plain Text Editor */}
+                {/* Plain Text Editor with Highlighting Support */}
                 <div
                   className={`w-full min-h-screen p-6 focus:outline-none text-editor ${
                     isDarkMode ? 'dark' : ''

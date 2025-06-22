@@ -23,26 +23,54 @@ import { auth, db } from '../firebase';
 import type { Document } from '../store/useDocumentStore';
 import type { SharedDocument } from '../types';
 
+// Auth return types
+interface AuthResult {
+  user: User | null;
+  error: Error | null;
+  message?: string | null;
+  needsVerification?: boolean;
+  unverifiedEmail?: string;
+  alreadyVerified?: boolean;
+}
+
 // Auth functions
-export const signUp = async (email: string, password: string, displayName?: string) => {
+export const signUp = async (email: string, password: string, displayName?: string): Promise<AuthResult> => {
   try {
+    console.log('📝 SIGNUP: Starting signup process for:', email);
+    
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
+    console.log('✅ SIGNUP: User created successfully:', {
+      uid: user.uid,
+      email: user.email,
+      emailVerified: user.emailVerified
+    });
+    
     // Update display name if provided
     if (displayName) {
+      console.log('📝 SIGNUP: Updating display name to:', displayName);
       await updateProfile(user, { displayName });
     }
     
     // Send email verification
+    console.log('📧 SIGNUP: Sending verification email to:', user.email);
     await sendEmailVerification(user);
+    console.log('✅ SIGNUP: Verification email sent successfully');
+    
+    // Sign out the user immediately after creating the account
+    // This prevents automatic login and forces email verification
+    console.log('🚪 SIGNUP: Signing out user to force email verification');
+    await signOut(auth);
+    console.log('✅ SIGNUP: User signed out successfully');
     
     return { 
-      user, 
+      user: null, // Return null since we signed them out
       error: null,
-      message: 'Account created successfully! Please check your email to verify your account before signing in.'
+      message: 'Account created successfully! Please check your email to verify your account. You will need to sign in after verifying your email.'
     };
   } catch (error) {
+    console.error('❌ SIGNUP: Error during signup:', error);
     return { 
       user: null, 
       error: error as Error,
@@ -51,11 +79,36 @@ export const signUp = async (email: string, password: string, displayName?: stri
   }
 };
 
-export const signIn = async (email: string, password: string) => {
+export const signIn = async (email: string, password: string): Promise<AuthResult> => {
   try {
+    console.log('🔑 SIGNIN: Starting signin process for:', email);
+    
     const result = await signInWithEmailAndPassword(auth, email, password);
+    
+    console.log('✅ SIGNIN: Firebase authentication successful:', {
+      uid: result.user.uid,
+      email: result.user.email,
+      emailVerified: result.user.emailVerified
+    });
+    
+    // Check if email is verified
+    if (!result.user.emailVerified) {
+      console.log('❌ SIGNIN: Email not verified, signing out user');
+      // Sign out the user if email is not verified
+      await signOut(auth);
+      console.log('🚪 SIGNIN: User signed out due to unverified email');
+      return { 
+        user: null, 
+        error: new Error('Please verify your email before signing in. Check your inbox for the verification link.'),
+        needsVerification: true,
+        unverifiedEmail: email
+      };
+    }
+    
+    console.log('✅ SIGNIN: Email verified, login successful');
     return { user: result.user, error: null };
   } catch (error) {
+    console.error('❌ SIGNIN: Error during signin:', error);
     return { user: null, error: error as Error };
   }
 };
@@ -69,8 +122,45 @@ export const logout = async () => {
   }
 };
 
+export const resendVerificationEmail = async (email: string, password: string): Promise<AuthResult> => {
+  try {
+    // Sign in temporarily to get the user object
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    
+    if (result.user.emailVerified) {
+      await signOut(auth);
+      return { 
+        user: null,
+        error: new Error('Email is already verified. You can sign in now.'),
+        alreadyVerified: true 
+      };
+    }
+    
+    // Send verification email
+    await sendEmailVerification(result.user);
+    
+    // Sign out after sending the email
+    await signOut(auth);
+    
+    return { 
+      user: null,
+      error: null,
+      message: 'Verification email sent successfully! Please check your inbox.'
+    };
+  } catch (error) {
+    return { 
+      user: null,
+      error: error as Error 
+    };
+  }
+};
+
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, callback);
+  console.log('🔥 FIREBASE: Setting up onAuthStateChanged listener');
+  return onAuthStateChanged(auth, (user) => {
+    console.log('🔥 FIREBASE: Auth state changed, calling callback with user:', user ? `${user.email} (verified: ${user.emailVerified})` : 'null');
+    callback(user);
+  });
 };
 
 // Helper function to convert Firestore timestamp to Date

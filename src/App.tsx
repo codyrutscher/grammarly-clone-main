@@ -36,7 +36,7 @@ function App() {
   useAuthProvider()
   useProfileProvider()
   
-  const { user, loading } = useAuthStore()
+  const { user, loading, isSigningUp } = useAuthStore()
   const { profile, loading: profileLoading } = useProfileStore()
   const { setUserTeams } = useTeamStore()
   const { isDarkMode } = useDarkModeStore()
@@ -63,8 +63,6 @@ function App() {
     loadTeams()
   }, [user, setUserTeams])
   
-  // Debug logging
-  console.log('App state:', { user: !!user, profile: !!profile, profileLoading })
   const [showSignupPage, setShowSignupPage] = useState(false)
   const [showLoginPage, setShowLoginPage] = useState(false)
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
@@ -104,7 +102,8 @@ function App() {
     )
   }
 
-  if (!user) {
+  // Show landing page if not authenticated or if we're in the signup process
+  if (!user || isSigningUp) {
     return (
       <div className={`min-h-screen transition-colors duration-300 relative overflow-x-hidden ${
         isDarkMode 
@@ -118,9 +117,6 @@ function App() {
           <div className="absolute top-32 right-20 w-24 h-24 bg-purple-200 rounded-full opacity-20 animate-pulse z-0" style={{animationDelay: '1s'}}></div>
           <div className="absolute top-16 left-1/3 w-20 h-20 bg-indigo-200 rounded-full opacity-15 animate-pulse z-0" style={{animationDelay: '0.5s'}}></div>
           <div className="absolute top-8 right-1/3 w-16 h-16 bg-pink-200 rounded-full opacity-25 animate-pulse z-0" style={{animationDelay: '1.5s'}}></div>
-          
-          
-          
           
           {/* Additional scattered circles */}
           <div className="absolute top-3/4 left-1/5 w-14 h-14 bg-sky-200 rounded-full opacity-19 animate-pulse z-0" style={{animationDelay: '5s'}}></div>
@@ -323,17 +319,15 @@ function App() {
                 <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Export to Word, PDF, or Google Docs with one click</p>
               </div>
               
-              <div className="text-center p-6">
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4 ${
-                  isDarkMode ? 'bg-orange-900/50' : 'bg-orange-100'
-                }`}>
-                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Citation Generator</h3>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manually create professional citations in APA, MLA, Chicago, and Harvard formats</p>
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4 ${
+                isDarkMode ? 'bg-orange-900/50' : 'bg-orange-100'
+              }`}>
+                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.168 18.477 18.582 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
               </div>
+              <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Citation Generator</h3>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manually create professional citations in APA, MLA, Chicago, and Harvard formats</p>
             </div>
           </div>
         </div>
@@ -618,10 +612,16 @@ function App() {
 
         <SignupPage
           isOpen={showSignupPage}
-          onClose={() => setShowSignupPage(false)}
+          onClose={() => {
+            setShowSignupPage(false);
+          }}
           onSwitchToLogin={() => {
             setShowSignupPage(false);
             setShowLoginPage(true);
+          }}
+          onSignupSuccess={() => {
+            // Keep the signup modal open to show success message
+            console.log('🔄 APP: SignupSuccess callback - keeping modal open');
           }}
         />
 

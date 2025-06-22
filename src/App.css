@@ -74,3 +74,168 @@
 .dark .text-editor::selection {
   background-color: rgba(96, 165, 250, 0.3); /* blue-400 with opacity */
 }
+
+/* Suggestion Highlighting Styles - High specificity to override other styles */
+.text-editor .suggestion-highlight {
+  position: relative !important;
+  display: inline !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  text-decoration: underline !important;
+  text-decoration-style: wavy !important;
+  text-underline-offset: 2px !important;
+  padding: 1px 0 !important;
+  border-radius: 2px !important;
+}
+
+/* Grammar and Spelling errors - Red */
+.text-editor .suggestion-highlight.grammar,
+.text-editor .suggestion-highlight.spelling {
+  background-color: rgba(254, 202, 202, 0.7) !important; /* More opaque for visibility */
+  text-decoration-color: #ef4444 !important;
+  border-bottom: 2px wavy #ef4444 !important;
+}
+
+.text-editor .suggestion-highlight.grammar:hover,
+.text-editor .suggestion-highlight.spelling:hover {
+  background-color: rgba(254, 202, 202, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Style suggestions - Purple */
+.text-editor .suggestion-highlight.style {
+  background-color: rgba(221, 214, 254, 0.7) !important;
+  text-decoration-color: #8b5cf6 !important;
+  border-bottom: 2px wavy #8b5cf6 !important;
+}
+
+.text-editor .suggestion-highlight.style:hover {
+  background-color: rgba(221, 214, 254, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Readability suggestions - Orange */
+.text-editor .suggestion-highlight.readability {
+  background-color: rgba(254, 215, 170, 0.7) !important;
+  text-decoration-color: #f97316 !important;
+  border-bottom: 2px wavy #f97316 !important;
+}
+
+.text-editor .suggestion-highlight.readability:hover {
+  background-color: rgba(254, 215, 170, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(249, 115, 22, 0.3) !important;
+}
+
+/* Structure suggestions - Green */
+.text-editor .suggestion-highlight.structure {
+  background-color: rgba(187, 247, 208, 0.7) !important;
+  text-decoration-color: #10b981 !important;
+  border-bottom: 2px wavy #10b981 !important;
+}
+
+.text-editor .suggestion-highlight.structure:hover {
+  background-color: rgba(187, 247, 208, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Tone suggestions - Yellow */
+.text-editor .suggestion-highlight.tone {
+  background-color: rgba(254, 240, 138, 0.7) !important;
+  text-decoration-color: #f59e0b !important;
+  border-bottom: 2px wavy #f59e0b !important;
+}
+
+.text-editor .suggestion-highlight.tone:hover {
+  background-color: rgba(254, 240, 138, 0.9) !important;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Dark mode adjustments */
+.dark .text-editor .suggestion-highlight.grammar,
+.dark .text-editor .suggestion-highlight.spelling {
+  background-color: rgba(239, 68, 68, 0.3) !important; /* More visible in dark mode */
+  text-decoration-color: #f87171 !important;
+  border-bottom: 2px wavy #f87171 !important;
+}
+
+.dark .text-editor .suggestion-highlight.style {
+  background-color: rgba(139, 92, 246, 0.3) !important;
+  text-decoration-color: #a78bfa !important;
+  border-bottom: 2px wavy #a78bfa !important;
+}
+
+.dark .text-editor .suggestion-highlight.readability {
+  background-color: rgba(249, 115, 22, 0.3) !important;
+  text-decoration-color: #fb923c !important;
+  border-bottom: 2px wavy #fb923c !important;
+}
+
+.dark .text-editor .suggestion-highlight.structure {
+  background-color: rgba(16, 185, 129, 0.3) !important;
+  text-decoration-color: #34d399 !important;
+  border-bottom: 2px wavy #34d399 !important;
+}
+
+.dark .text-editor .suggestion-highlight.tone {
+  background-color: rgba(245, 158, 11, 0.3) !important;
+  text-decoration-color: #fbbf24 !important;
+  border-bottom: 2px wavy #fbbf24 !important;
+}
+
+/* Suggestion tooltip on hover */
+.text-editor .suggestion-highlight::after {
+  content: attr(data-tooltip) !important;
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  padding: 6px 10px !important;
+  background-color: rgba(0, 0, 0, 0.9) !important;
+  color: white !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+  z-index: 1000 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.text-editor .suggestion-highlight:hover::after {
+  opacity: 1 !important;
+}
+
+/* Selected suggestion highlight */
+.text-editor .suggestion-highlight.selected {
+  animation: pulse 1s ease-in-out infinite !important;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Ensure proper text wrapping with highlights */
+.text-editor.with-highlights {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Fix for contenteditable with highlights */
+.text-editor.with-highlights br {
+  display: block;
+  content: "";
+}
+
+/* Prevent text decoration on nested elements */
+.text-editor .suggestion-highlight * {
+  text-decoration: none !important;
+}

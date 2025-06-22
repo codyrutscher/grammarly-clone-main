@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { signUp } from '../utils/firebaseUtils';
 import { useDarkModeStore } from '../store/useDarkModeStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface SignupPageProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchToLogin: () => void;
+  onSignupSuccess?: () => void;
 }
 
-export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps) {
+export function SignupPage({ isOpen, onClose, onSwitchToLogin, onSignupSuccess }: SignupPageProps) {
   const { isDarkMode } = useDarkModeStore();
+  const { setIsSigningUp } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,7 +21,19 @@ export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  if (!isOpen) return null;
+  console.log('📝 SIGNUP PAGE: Render state:', {
+    isOpen,
+    loading,
+    error,
+    successMessage,
+    email,
+    timestamp: new Date().toISOString()
+  });
+
+  if (!isOpen) {
+    console.log('📝 SIGNUP PAGE: Not open, returning null');
+    return null;
+  }
 
   // Password validation helpers
   const isPasswordValid = password.length >= 6;
@@ -28,39 +43,87 @@ export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📝 SIGNUP PAGE: Form submitted for email:', email);
+    
     setError('');
     setSuccessMessage('');
     setLoading(true);
+    
+    // Set signing up flag to prevent auth state flashing
+    setIsSigningUp(true);
 
     if (password !== confirmPassword) {
+      console.log('❌ SIGNUP PAGE: Password mismatch');
       setError('Passwords do not match');
       setLoading(false);
+      setIsSigningUp(false);
       return;
     }
 
     if (password.length < 6) {
+      console.log('❌ SIGNUP PAGE: Password too short');
       setError('Password must be at least 6 characters long');
       setLoading(false);
+      setIsSigningUp(false);
       return;
     }
 
     try {
+      console.log('📝 SIGNUP PAGE: Calling signUp function...');
       const result = await signUp(email, password, displayName);
+      console.log('📝 SIGNUP PAGE: SignUp result:', result);
 
       if (result.error) {
+        console.log('❌ SIGNUP PAGE: SignUp error:', result.error.message);
         setError(result.error.message);
+        setIsSigningUp(false);
       } else if (result.message) {
+        console.log('✅ SIGNUP PAGE: SignUp successful, setting success message');
         setSuccessMessage(result.message);
+        // Clear form fields
         setEmail('');
         setPassword('');
         setConfirmPassword('');
         setDisplayName('');
+        console.log('📝 SIGNUP PAGE: Form fields cleared, success message set');
+        // Notify parent to preserve modal state
+        onSignupSuccess?.();
+        // Reset signing up flag after a delay to ensure auth state has stabilized
+        setTimeout(() => {
+          setIsSigningUp(false);
+        }, 2000);
       }
     } catch (err) {
+      console.error('❌ SIGNUP PAGE: Unexpected error:', err);
       setError('An unexpected error occurred');
+      setIsSigningUp(false);
     } finally {
       setLoading(false);
+      console.log('📝 SIGNUP PAGE: HandleSubmit completed, loading set to false');
     }
+  };
+
+  // Clear success message when switching to login
+  const handleSwitchToLogin = () => {
+    console.log('📝 SIGNUP PAGE: Switching to login page');
+    setSuccessMessage('');
+    setError('');
+    setIsSigningUp(false);
+    onSwitchToLogin();
+  };
+
+  // Handle close button click
+  const handleClose = () => {
+    console.log('📝 SIGNUP PAGE: Closing signup page');
+    // Clear all state when closing
+    setSuccessMessage('');
+    setError('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setDisplayName('');
+    setIsSigningUp(false);
+    onClose();
   };
 
   return (
@@ -94,23 +157,61 @@ export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">S</span>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
+                successMessage 
+                  ? 'bg-gradient-to-br from-green-500 to-green-600' 
+                  : 'bg-gradient-to-br from-blue-500 to-purple-600'
+              }`}>
+                {successMessage ? (
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <span className="text-white font-bold text-xl">S</span>
+                )}
               </div>
             </div>
             <h1 className={`text-3xl font-bold mb-2 ${
               isDarkMode ? 'text-white' : 'text-gray-900'
             }`}>
-              Create your account
+              {successMessage ? 'Account Created!' : 'Create your account'}
             </h1>
             <p className={`text-sm ${
               isDarkMode ? 'text-gray-400' : 'text-gray-600'
             }`}>
-              Join StudyWrite and start improving your writing today
+              {successMessage ? 'One more step to get started' : 'Join StudyWrite and start improving your writing today'}
             </p>
           </div>
 
-          {/* Form */}
+          {/* Success Message Display */}
+          {successMessage && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                <div className="flex items-start">
+                  <svg className="w-5 h-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-green-700 text-sm font-medium mb-2">{successMessage}</p>
+                    <p className="text-green-600 text-xs">
+                      Important: You must verify your email before you can sign in. 
+                      Check your inbox (and spam folder) for the verification link.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSwitchToLogin}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg transform hover:scale-[1.02]"
+              >
+                Go to Sign In
+              </button>
+            </div>
+          )}
+
+          {/* Form - Hidden when success message is shown */}
+          {!successMessage && (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="displayName" className={`block text-sm font-medium mb-2 ${
@@ -256,51 +357,45 @@ export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps
               </div>
             )}
 
-            {successMessage && (
-              <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 text-sm">{successMessage}</span>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                  Creating Account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className={`text-sm ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-600'
-            }`}>
-              Already have an account?{' '}
+            {!successMessage && (
               <button
-                onClick={onSwitchToLogin}
-                className="text-blue-500 hover:text-blue-600 font-medium transition-colors"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
               >
-                Sign in
+                {loading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                    Creating Account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
               </button>
-            </p>
-          </div>
+            )}
+          </form>
+          )}
+
+          {/* Footer - Hidden when success message is shown */}
+          {!successMessage && (
+            <div className="mt-8 text-center">
+              <p className={`text-sm ${
+                isDarkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                Already have an account?{' '}
+                <button
+                  onClick={handleSwitchToLogin}
+                  className="text-blue-500 hover:text-blue-600 font-medium transition-colors"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          )}
 
           {/* Close button */}
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className={`absolute top-4 right-4 p-2 rounded-lg transition-colors ${
               isDarkMode 
                 ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' 
@@ -315,4 +410,4 @@ export function SignupPage({ isOpen, onClose, onSwitchToLogin }: SignupPageProps
       </div>
     </div>
   );
-} 
+}
