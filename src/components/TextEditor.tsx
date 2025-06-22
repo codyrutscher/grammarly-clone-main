@@ -204,6 +204,14 @@ export function TextEditor() {
   // Check if current document is editable - all shared documents have full access
   const isDocumentEditable = currentDocument && (!currentDocument.isShared || true);
   
+  useEffect(() => {
+    console.log('🔍 DEBUG: Component rendered', {
+      content: content.slice(0, 50),
+      contentLength: content.length,
+      currentDocumentId: currentDocument?.id,
+      editorHasContent: editorRef.current?.innerText
+    });
+  });
   // Debug logging for permissions
   useEffect(() => {
     if (currentDocument) {
@@ -283,78 +291,69 @@ export function TextEditor() {
   );
 
   // Update content when currentDocument changes
-  useEffect(() => {
-    if (currentDocument) {
-      console.log('📄 Document change detected:', {
-        id: currentDocument.id,
-        title: currentDocument.title,
-        contentPreview: currentDocument.content.substring(0, 100),
-        contentLength: currentDocument.content.length,
-        previousDocumentId: currentDocumentId.current,
-        isNewDocument: currentDocumentId.current !== currentDocument.id
-      });
-      
-      // Check if this is actually a new document
-      const isNewDocument = currentDocumentId.current !== currentDocument.id;
-      
-      // Update the tracked document ID
-      currentDocumentId.current = currentDocument.id;
-      
-      console.log('📝 Setting content:', currentDocument.content);
-      setContent(currentDocument.content);
-      
-              // Update the editor content
-        if (editorRef.current) {
-          if (suggestions.length > 0 && !isNewDocument) {
-            // Apply highlights if there are suggestions
-            editorRef.current.innerHTML = applyHighlights(currentDocument.content, suggestions, isDarkMode);
-            editorRef.current.classList.add('with-highlights');
-          } else {
-            // Otherwise, just set the text
-            editorRef.current.innerText = currentDocument.content;
-            editorRef.current.classList.remove('with-highlights');
-          }
-        }
-      
-      // ONLY clear suggestions when switching to a DIFFERENT document
-      if (isNewDocument) {
-        console.log('📄 NEW DOCUMENT - clearing suggestions');
-        setSuggestions([]);
-        setHasGeneratedSuggestions(false);
-      } else {
-        console.log('📄 SAME DOCUMENT UPDATE - preserving suggestions');
-      }
-    }
-  }, [currentDocument, setSuggestions]);
-
-  // Apply highlights when suggestions change
-  useEffect(() => {
-    if (editorRef.current && content && !isApplyingHighlights.current) {
-      isApplyingHighlights.current = true;
-      
+  // Update content when currentDocument changes
+useEffect(() => {
+  if (currentDocument) {
+    console.log('📄 Document change detected:', {
+      id: currentDocument.id,
+      title: currentDocument.title,
+      contentPreview: currentDocument.content.substring(0, 100),
+      contentLength: currentDocument.content.length,
+      previousDocumentId: currentDocumentId.current,
+      isNewDocument: currentDocumentId.current !== currentDocument.id
+    });
+    
+    // Check if this is actually a new document
+    const isNewDocument = currentDocumentId.current !== currentDocument.id;
+    
+    // Update the tracked document ID
+    currentDocumentId.current = currentDocument.id;
+    
+    console.log('📝 Setting content:', currentDocument.content);
+    setContent(currentDocument.content);
+    
+    // Update the editor content ONLY if it's different
+    if (editorRef.current && editorRef.current.innerText !== currentDocument.content) {
       // Save cursor position
-      const cursorOffset = getCursorOffset(editorRef.current);
+      const selection = window.getSelection();
+      const range = selection?.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const offset = range ? range.startOffset : 0;
       
-      if (suggestions.length > 0) {
-        // Apply highlights
-        const highlightedHTML = applyHighlights(content, suggestions, isDarkMode);
-        editorRef.current.innerHTML = highlightedHTML;
-        editorRef.current.classList.add('with-highlights');
-      } else {
-        // Remove highlights
-        editorRef.current.innerText = content;
-        editorRef.current.classList.remove('with-highlights');
-      }
+      // Set content
+      editorRef.current.innerText = currentDocument.content;
       
       // Restore cursor position
-      setTimeout(() => {
-        if (editorRef.current) {
-          restoreCursorPosition(editorRef.current, cursorOffset);
+      if (range && editorRef.current.firstChild) {
+        try {
+          const newRange = document.createRange();
+          newRange.setStart(editorRef.current.firstChild, Math.min(offset, editorRef.current.innerText.length));
+          newRange.collapse(true);
+          selection?.removeAllRanges();
+          selection?.addRange(newRange);
+        } catch (e) {
+          // Ignore cursor restoration errors
         }
-        isApplyingHighlights.current = false;
-      }, 0);
+      }
     }
-  }, [suggestions, content]);
+    
+    // ONLY clear suggestions when switching to a DIFFERENT document
+    if (isNewDocument) {
+      console.log('📄 NEW DOCUMENT - clearing suggestions');
+      setSuggestions([]);
+      setHasGeneratedSuggestions(false);
+    } else {
+      console.log('📄 SAME DOCUMENT UPDATE - preserving suggestions');
+    }
+  }
+}, [currentDocument, setSuggestions]);
+
+  // Apply highlights when suggestions change - TEMPORARILY DISABLED
+  useEffect(() => {
+    // TEMPORARILY DISABLED - No highlighting to prevent backwards typing
+    // The editor will work as a pure text editor for now
+    
+    
+  }, [suggestions, content, isDarkMode]);
 
   const handleCreateNewDocument = async () => {
     if (!user) return;
@@ -396,26 +395,9 @@ export function TextEditor() {
     
     // Update the editor with highlighting for remaining suggestions
     if (editorRef.current) {
-      if (remainingSuggestions.length > 0) {
-        // Update positions of remaining suggestions based on the text change
-        const lengthChange = mappedSuggestion.suggestion.length - mappedSuggestion.originalText.length;
-        const updatedSuggestions = remainingSuggestions.map(s => {
-          if (s.startIndex > mappedSuggestion.endIndex) {
-            return {
-              ...s,
-              startIndex: s.startIndex + lengthChange,
-              endIndex: s.endIndex + lengthChange
-            };
-          }
-          return s;
-        });
-        setSuggestions(updatedSuggestions);
-        editorRef.current.innerHTML = applyHighlights(newContent, updatedSuggestions, isDarkMode);
-        editorRef.current.classList.add('with-highlights');
-      } else {
-        editorRef.current.innerText = newContent;
-        editorRef.current.classList.remove('with-highlights');
-      }
+      // NO HIGHLIGHTING - just set plain text to prevent backwards typing
+      editorRef.current.innerText = newContent;
+      editorRef.current.classList.remove('with-highlights');
     }
     
     // Add to feedback store
@@ -523,24 +505,39 @@ export function TextEditor() {
   }, [suggestions, hasGeneratedSuggestions]);
 
     // Fixed handleInput to work with highlighted text
-  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    if (!currentDocument || isApplyingHighlights.current) return;
-     
-    // Get the plain text content (this strips HTML but preserves the actual text)
-    const newContent = e.currentTarget.innerText || '';
-    
-    // Only update if content actually changed
-    if (newContent !== content) {
+    const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+      console.log('🔍 DEBUG: handleInput called');
+      
+      if (!currentDocument) {
+        console.log('❌ No current document');
+        return;
+      }
+      
+      // Get cursor position before any updates
+      const selection = window.getSelection();
+      const cursorOffset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : 0;
+      
+      // Get the current text
+      const element = e.currentTarget;
+      const newContent = element.innerText || '';
+      
+      console.log('🔍 DEBUG: Input event', {
+        oldContent: content.slice(0, 50),
+        newContent: newContent.slice(0, 50),
+        cursorOffset,
+        contentChanged: newContent !== content
+      });
+      
+      // Update state
       setContent(newContent);
       updateDocument(currentDocument.id, { content: newContent });
       
-      // Clear suggestions when user edits text, as positions may have changed
+      // Clear suggestions when user edits text
       if (suggestions.length > 0) {
         setSuggestions([]);
         setHasGeneratedSuggestions(false);
       }
-    }
-  };
+    };
 
   // Handle click on highlighted suggestions
   useEffect(() => {
@@ -581,14 +578,10 @@ export function TextEditor() {
     }
   }, [suggestions]);
 
-  // Handle key press events for better control
+  // Handle key press events - simplified to avoid any issues
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Handle Tab key
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      document.execCommand('insertText', false, '\t');
-    }
-    // Don't prevent default for Enter or Space - let them work naturally
+    // For now, let all keys work naturally including Tab
+    // Don't intercept anything to see if that fixes the backwards typing
   };
 
   // Handle paste to maintain plain text
@@ -1099,26 +1092,46 @@ export function TextEditor() {
               <div className="relative">
                 {/* Plain Text Editor with Highlighting Support */}
                 <div
-                  className={`w-full min-h-screen p-6 focus:outline-none text-editor ${
-                    isDarkMode ? 'dark' : ''
-                  }`}
-                  contentEditable={isDocumentEditable ? "true" : "false"}
-                  ref={editorRef}
-                  onInput={handleInput}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  onBlur={handleBlur}
-                  suppressContentEditableWarning
-                  style={{
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    lineHeight: '1.6',
-                    fontSize: '16px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    minHeight: '100vh',
-                    caretColor: isDarkMode ? '#fff' : '#000'
-                  }}
-                />
+  className={`w-full min-h-screen p-6 focus:outline-none ${
+    isDarkMode ? 'text-white' : 'text-gray-900'
+  }`}
+  contentEditable={isDocumentEditable ? "true" : "false"}
+  ref={editorRef}
+  onInput={(e) => {
+    // Prevent React from interfering
+    e.persist?.();
+    
+    // Get the actual text content
+    const target = e.target as HTMLDivElement;
+    const text = target.innerText;
+    
+    // Update state without triggering re-render of the editor
+    setContent(text);
+    
+    // Update document in background
+    if (currentDocument) {
+      updateDocument(currentDocument.id, { content: text });
+    }
+    
+    // Clear suggestions if any
+    if (suggestions.length > 0) {
+      setSuggestions([]);
+      setHasGeneratedSuggestions(false);
+    }
+  }}
+  onPaste={handlePaste}
+  suppressContentEditableWarning
+  style={{
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    lineHeight: '1.6',
+    fontSize: '16px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    minHeight: '100vh',
+    backgroundColor: 'transparent',
+    outline: 'none'
+  }}
+/>
 
                 {/* Read-only indicator */}
                 {!isDocumentEditable && currentDocument?.isShared && (
