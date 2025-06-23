@@ -363,22 +363,7 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
                   </div>
                 </button>
 
-                <button
-                  onClick={handleExportDocx}
-                  className={`p-4 rounded-lg border transition-colors ${
-                    isDarkMode
-                      ? 'border-gray-600 hover:bg-gray-700'
-                      : 'border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="text-3xl mb-2">📘</div>
-                  <div className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Word Document (.docx)
-                  </div>
-                  <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Microsoft Word format
-                  </div>
-                </button>
+               
 
                 <button
                   onClick={handleCopyToClipboard}
